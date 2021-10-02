@@ -7,6 +7,7 @@ import (
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 )
@@ -34,20 +35,35 @@ func main() {
 	command.Flags().StringVar(&constants.DB_NAME, "dbname", "smtp2.db", "set DB name")
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, err.Error())
+		return
 	}
+
+	var logger *zap.Logger
+	var err error
+
+	if config.Debug {
+		logger, err = zap.NewDevelopment()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+
+	if err != nil {
+		panic(err.Error())
+		return
+	}
+
+	sugared := logger.Sugar()
 
 	sql.DB, sql.DBERR = sql.NewSQL()
 	sql.DB.Init()
 
 	if sql.DBERR != nil {
-		fmt.Println("FATAL: Error while creating database")
-		fmt.Println(sql.DBERR)
+		sugared.Fatal("Error while creating database: " + sql.DBERR.Error())
 		return
 	}
 
-	fmt.Println("INFO: Database created successfully")
+	sugared.Info("Database created successfully")
 
 	r := mux.NewRouter()
 	r.HandleFunc("/smtp2", httphandlers.WelcomeHandler).Methods(httphandlers.GET)
@@ -68,13 +84,13 @@ func main() {
 	// SMTP2 Sender Server Verification Protocol
 	r.HandleFunc("/smtp2/message/verify", httphandlers.MessageVerificationHandlers).Methods(httphandlers.GET)
 
-	fmt.Println("Serving...")
+	sugared.Info("Serving...")
 	serve := config.Host + ":" + config.Port
-	fmt.Println(serve)
-	err := http.ListenAndServe(serve, r)
+	sugared.Info("Serving on following URL: " + serve)
+	err = http.ListenAndServe(serve, r)
 	if err != nil {
-		fmt.Println(err)
+		sugared.Fatal(err.Error())
 	}
 
-	fmt.Println("Done serving...")
+	sugared.Info("Done serving...")
 }
