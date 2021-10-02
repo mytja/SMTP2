@@ -15,8 +15,9 @@ func VerifyEmailServer(mail sql.ReceivedMessage) error {
 		return err
 	}
 	fmt.Println(domain)
-	id := fmt.Sprint(mail.ID)
+	id := fmt.Sprint(mail.ServerID)
 	reqdom := domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.ServerPass
+	fmt.Println(reqdom)
 	res, err := http.Get(reqdom)
 	if err != nil {
 		return err
@@ -66,5 +67,6 @@ func VerifyMessage(mail sql.ReceivedMessage) (bool, error) {
 		return false, sendererr
 	}
 	servererr := VerifyEmailServer(mail)
+	fmt.Println(servererr)
 	return servererr == nil, servererr
 }

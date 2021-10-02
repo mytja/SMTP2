@@ -6,7 +6,7 @@ import (
 )
 
 type SentMessage struct {
-	ID        int `db:"uid"`
+	ID        int
 	Title     string
 	Body      string
 	ToEmail   string `db:"to_email"`
@@ -17,8 +17,8 @@ type SentMessage struct {
 func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
 	var message SentMessage
 
-	err := db.db.Get(&message, "SELECT * FROM sentmsgs WHERE uid=$1", id)
-	fmt.Println("MSGGETID:", message.ID)
+	err := db.db.Get(&message, "SELECT * FROM sentmsgs WHERE id=$1", id)
+	//fmt.Println("MSGGETID:", message.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
 
 func (db *sqlImpl) CommitSentMessage(msg SentMessage) (int64, error) {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO sentmsgs (uid, title, body, to_email, from_email, pass) VALUES (:uid, :title, :body, :to_email, :from_email, :pass); SELECT last_insert_rowid();",
+		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass) VALUES (:id, :title, :body, :to_email, :from_email, :pass); SELECT last_insert_rowid();",
 		msg)
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -46,20 +46,7 @@ func (db *sqlImpl) CommitSentMessage(msg SentMessage) (int64, error) {
 
 func (db *sqlImpl) GetLastSentID() int {
 	var id int
-	err := DB.GetDB().Get(&id, "SELECT uid FROM sentmsgs WHERE uid = (SELECT MAX(uid) FROM sentmsgs)")
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return 0
-		}
-		fmt.Println(err)
-		return -1
-	}
-	return id + 1
-}
-
-func (db *sqlImpl) GetLastReceivedID() int {
-	var id int
-	err := DB.GetDB().Get(&id, "SELECT uid FROM receivedmsgs WHERE uid = (SELECT MAX(uid) FROM receivedmsgs)")
+	err := DB.GetDB().Get(&id, "SELECT id FROM sentmsgs WHERE id = (SELECT MAX(id) FROM sentmsgs)")
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return 0

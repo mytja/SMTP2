@@ -23,5 +23,5 @@ func GetHostnameFromURI(uri string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return u.Scheme + u.Host, err
+	return u.Scheme + "://" + u.Host, err
 }
