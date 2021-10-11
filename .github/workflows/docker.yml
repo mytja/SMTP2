@@ -15,9 +15,9 @@ jobs:
       - name: Get current Go version
         run: go version
       - name: Get Go dependencies
-        run: go mod download && go get .
+        run: go mod download
       - name: Build app
-        run: go build -v -o SMTP2-server .
+        run: go build -v -o SMTP2-server main.go
   docker:
     name: Docker build
     if: startsWith(github.ref, 'refs/tags/')
