@@ -2,13 +2,16 @@ package constants
 
 import "github.com/mytja/SMTP2/helpers"
 
-var JWT_SIGNING_KEY []byte = helpers.StringToBytearray("46ad2cb520028e1f5e2eab8d860a547353ddbabdb6affb923c075c92518c7e02")
-var JWT_ISSUER = "SMTP2AuthCA"
+var JwtSigningKey []byte = helpers.StringToBytearray("46ad2cb520028e1f5e2eab8d860a547353ddbabdb6affb923c075c92518c7e02")
+var JwtIssuer = "SMTP2AuthCA"
 
-// ENABLE_SMPT2_SSV SMPT2 SSV stands for SMTP2 Sender Server Verification
-var ENABLE_SMPT2_SSV = true
+// ENABLE_SMTP2_SSV SMPT2 SSV stands for SMTP2 Sender Server Verification
+var EnableSmtp2Ssv = true
+
+var ForceHttps = false
+var ForceHttpsForMailDomain = false
 
 var (
-	SERVER_URL string
-	DB_NAME    string
+	ServerUrl string
+	DbName    string
 )

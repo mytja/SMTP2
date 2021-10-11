@@ -31,8 +31,8 @@ func main() {
 	command.Flags().BoolVar(&config.Debug, "debug", false, "enable debug mode")
 	command.Flags().StringVar(&config.Host, "host", "0.0.0.0", "set server host")
 	command.Flags().StringVar(&config.Port, "port", "8080", "set server port")
-	command.Flags().StringVar(&constants.SERVER_URL, "url", "http://0.0.0.0:8080", "set server URL")
-	command.Flags().StringVar(&constants.DB_NAME, "dbname", "smtp2.db", "set DB name")
+	command.Flags().StringVar(&constants.ServerUrl, "url", "http://0.0.0.0:8080", "set server URL")
+	command.Flags().StringVar(&constants.DbName, "dbname", "smtp2.db", "set DB name")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

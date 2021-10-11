@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"fmt"
 	"github.com/mytja/SMTP2/objects"
 )
 
@@ -15,4 +16,11 @@ func (db *sqlImpl) NewUser(email string, password string) error {
 		return err
 	}
 	return nil
+}
+
+func (db *sqlImpl) GetUserByEmail(email string) (objects.User, error) {
+	var user objects.User
+	fmt.Println(email)
+	err := db.db.Get(&user, "SELECT * FROM users WHERE email=$1", email)
+	return user, err
 }

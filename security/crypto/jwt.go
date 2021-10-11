@@ -16,12 +16,12 @@ func GetJWTFromUserPass(email string, pass string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": email,
 		"pass":  pass,
-		"iss":   constants.JWT_ISSUER,
+		"iss":   constants.JwtIssuer,
 		//"exp": 3 * 24 * 60 * 60,
 	})
 
 	// Sign and get the complete encoded token as a string using the secret
-	tokenString, err := token.SignedString(constants.JWT_SIGNING_KEY)
+	tokenString, err := token.SignedString(constants.JwtSigningKey)
 
 	return tokenString, err
 }
@@ -34,11 +34,11 @@ func CheckJWT(tokenString string) (jwt.MapClaims, error) {
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return constants.JWT_SIGNING_KEY, nil
+		return constants.JwtSigningKey, nil
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		if claims["iss"] == constants.JWT_ISSUER {
+		if claims["iss"] == constants.JwtIssuer {
 			return claims, nil
 		}
 		return nil, errors.New("JWT issuer isn't correct")

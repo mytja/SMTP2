@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mytja/SMTP2/helpers"
+	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/sql"
 	"io/ioutil"
 	"net/http"
@@ -40,7 +41,11 @@ func VerifyEmailSender(mail sql.ReceivedMessage) error {
 	domain := helpers.GetDomainFromEmail(mail.FromEmail)
 	fmt.Println(domain)
 	id := fmt.Sprint(mail.ServerID)
-	reqdom := "http://" + domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.ServerPass
+	protocol := "http://"
+	if constants.ForceHttpsForMailDomain {
+		protocol = "https://"
+	}
+	reqdom := protocol + domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.ServerPass
 	fmt.Println(reqdom)
 	res, err := http.Get(reqdom)
 	if err != nil {

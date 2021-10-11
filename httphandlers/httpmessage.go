@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
+	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/security"
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +41,11 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	domain := helpers.GetDomainFromEmail(msg.ToEmail)
 	fmt.Println(domain)
 
-	reqdom := "http://" + domain + "/smtp2/message/receive"
+	protocol := "http://"
+	if constants.ForceHttps {
+		protocol = "https://"
+	}
+	reqdom := protocol + domain + "/smtp2/message/receive"
 	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
 	req.Header.Set("Title", msg.Title)
 	req.Header.Set("To", msg.ToEmail)
@@ -60,10 +65,10 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("ServerID", fmt.Sprint(idstring))
 	req.Header.Set(
 		"URI",
-		"http://"+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
+		protocol+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
 	)
 
-	time.Sleep(1 * time.Second)
+	//time.Sleep(1 * time.Second)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -74,6 +79,14 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		// And let's make a 201 response
 		helpers.Write(w, "OK", http.StatusCreated)
 		return
+	}
+	if res.StatusCode == http.StatusNotAcceptable {
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			helpers.Write(w, "Error while reading request body", http.StatusInternalServerError)
+			return
+		}
+		helpers.Write(w, helpers.BytearrayToString(body), http.StatusNotAcceptable)
 	}
 	fmt.Println(req.Header.Get("URI"))
 	fmt.Println(reqdom)
@@ -92,6 +105,14 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	atoi, err := strconv.Atoi(id)
 	if err != nil {
 		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
+		return
+	}
+	_, err = sql.DB.GetUserByEmail(to)
+	if err != nil {
+		helpers.Write(w,
+			"Could not find user in our database or there was an internal error in our database: "+err.Error(),
+			http.StatusNotAcceptable,
+		)
 		return
 	}
 	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass)
