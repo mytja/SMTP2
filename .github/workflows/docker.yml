@@ -16,8 +16,10 @@ jobs:
         run: go version
       - name: Get Go dependencies
         run: go mod download && go mod tidy
+      - name: Set env
+        run: go env -w GOFLAGS=-mod=mod
       - name: Build app
-        run: go build -v -mod=mod -o SMTP2-server main.go
+        run: go build -v -o SMTP2-server main.go
   docker:
     name: Docker build
     if: startsWith(github.ref, 'refs/tags/')
