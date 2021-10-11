@@ -15,7 +15,7 @@ jobs:
       - name: Get current Go version
         run: go version
       - name: Get Go dependencies
-        run: go mod download && go get github.com/mytja/SMTP2/sql
+        run: go mod download
       - name: Set env
         run: go env -w GOFLAGS=-mod=mod
       - name: Build app
