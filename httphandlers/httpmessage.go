@@ -19,6 +19,11 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	to := r.FormValue("To")
 	body := r.FormValue("Body")
+	replyto := r.FormValue("ReplyTo")
+	if !strings.Contains(to, "@") {
+		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
+		return
+	}
 	ok, from, err := crypto2.CheckUser(r)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -33,7 +38,17 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	msg := sql.NewSentMessage(title, to, from, body, pass)
+	var replyid int
+	if replyto != "" {
+		replyid, err = strconv.Atoi(replyto)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		replyid = -1
+	}
+	msg := sql.NewSentMessage(title, to, from, body, pass, replyid)
 	msg.ID = sql.DB.GetLastSentID()
 	fmt.Println(msg.ID)
 
@@ -67,6 +82,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		"URI",
 		protocol+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
 	)
+	req.Header.Set("ReplyTo", fmt.Sprint(replyid))
 
 	//time.Sleep(1 * time.Second)
 
@@ -101,21 +117,27 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	from := q.Get("From")
 	id := q.Get("ServerID")
 	pass := q.Get("ServerPass")
-	fmt.Println(id, title, uri, to, from)
+	replyto := q.Get("ReplyTo")
+	fmt.Println(id, title, uri, to, from, replyto)
 	atoi, err := strconv.Atoi(id)
 	if err != nil {
 		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
 		return
 	}
+	replyid, err := strconv.Atoi(replyto)
+	if err != nil {
+		helpers.Write(w, "ReplyTo ID isn't a valid integer", http.StatusBadRequest)
+		return
+	}
 	_, err = sql.DB.GetUserByEmail(to)
 	if err != nil {
 		helpers.Write(w,
-			"Could not find user in our database or there was an internal error in our database: "+err.Error(),
+			fmt.Sprint("Could not find recipient in our database or there was an internal error in recipient's database: ", err.Error()),
 			http.StatusNotAcceptable,
 		)
 		return
 	}
-	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass)
+	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass, replyid)
 	verification, _ := security.VerifyMessage(msg)
 	if !verification {
 		helpers.Write(w, "Failed to verify message.", http.StatusForbidden)
@@ -146,6 +168,10 @@ func MessageVerificationHandlers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	helpers.Write(w, "OK", http.StatusOK)
+}
+
+func GetRepliesHandler(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {

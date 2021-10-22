@@ -12,6 +12,7 @@ type SentMessage struct {
 	ToEmail   string `db:"to_email"`
 	FromEmail string `db:"from_email"`
 	Pass      string
+	ReplyTo   int `db:"reply_to"`
 }
 
 func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
@@ -31,7 +32,7 @@ func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
 
 func (db *sqlImpl) CommitSentMessage(msg SentMessage) (int64, error) {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass) VALUES (:id, :title, :body, :to_email, :from_email, :pass); SELECT last_insert_rowid();",
+		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass, reply_to) VALUES (:id, :title, :body, :to_email, :from_email, :pass, :reply_to); SELECT last_insert_rowid();",
 		msg)
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -57,12 +58,13 @@ func (db *sqlImpl) GetLastSentID() int {
 	return id + 1
 }
 
-func NewSentMessage(title string, to string, from string, body string, pass string) SentMessage {
+func NewSentMessage(title string, to string, from string, body string, pass string, reply_to int) SentMessage {
 	return SentMessage{
 		Title:     title,
 		ToEmail:   to,
 		FromEmail: from,
 		Body:      body,
 		Pass:      pass,
+		ReplyTo:   reply_to,
 	}
 }
