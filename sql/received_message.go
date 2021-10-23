@@ -12,7 +12,6 @@ type ReceivedMessage struct {
 	FromEmail  string `db:"from_email"`
 	ServerID   int    `db:"server_id"`   // This is used to get specific message from server
 	ServerPass string `db:"server_pass"` // This is password used to access this email from server
-	ReplyTo    int    `db:"reply_to"`
 }
 
 func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
@@ -26,7 +25,7 @@ func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
 
 func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, reply_to) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :reply_to)",
+		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass)",
 		msg)
 	err = db.Commit()
 	if err != nil {
@@ -37,21 +36,8 @@ func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	return nil
 }
 
-func (db *sqlImpl) GetLastReceivedID() int {
-	var id int
-	err := DB.GetDB().Get(&id, "SELECT id FROM receivedmsgs WHERE id = (SELECT MAX(id) FROM receivedmsgs)")
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return 0
-		}
-		fmt.Println(err)
-		return -1
-	}
-	return id + 1
-}
-
 func NewReceivedMessage(
-	title string, URI string, to string, from string, id int, pass string, reply_to int) ReceivedMessage {
+	title string, URI string, to string, from string, id int, pass string) ReceivedMessage {
 	return ReceivedMessage{
 		Title:      title,
 		URI:        URI,
@@ -59,6 +45,5 @@ func NewReceivedMessage(
 		FromEmail:  from,
 		ServerID:   id,
 		ServerPass: pass,
-		ReplyTo:    reply_to,
 	}
 }

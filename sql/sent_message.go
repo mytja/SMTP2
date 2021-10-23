@@ -1,10 +1,5 @@
 package sql
 
-import (
-	"errors"
-	"fmt"
-)
-
 type SentMessage struct {
 	ID        int
 	Title     string
@@ -12,10 +7,9 @@ type SentMessage struct {
 	ToEmail   string `db:"to_email"`
 	FromEmail string `db:"from_email"`
 	Pass      string
-	ReplyTo   int `db:"reply_to"`
 }
 
-func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
+func (db *sqlImpl) GetSentMessage(id int) (*SentMessage, error) {
 	var message SentMessage
 
 	err := db.db.Get(&message, "SELECT * FROM sentmsgs WHERE id=$1", id)
@@ -23,48 +17,26 @@ func (db *sqlImpl) GetSentMessage(id int, pass string) (*SentMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	if message.Pass == pass {
-		return &message, nil
-	} else {
-		return nil, errors.New("unauthenticated")
-	}
+	return &message, nil
 }
 
-func (db *sqlImpl) CommitSentMessage(msg SentMessage) (int64, error) {
-	res, err := db.tx.NamedExec(
-		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass, reply_to) VALUES (:id, :title, :body, :to_email, :from_email, :pass, :reply_to); SELECT last_insert_rowid();",
+func (db *sqlImpl) CommitSentMessage(msg SentMessage) error {
+	_, err := db.tx.NamedExec(
+		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass) VALUES (:id, :title, :body, :to_email, :from_email, :pass)",
 		msg)
-	id, err := res.LastInsertId()
-	if err != nil {
-		return -1, err
-	}
 	err = db.Commit()
 	if err != nil {
-		return -1, err
+		return err
 	}
-	return id, nil
+	return nil
 }
 
-func (db *sqlImpl) GetLastSentID() int {
-	var id int
-	err := DB.GetDB().Get(&id, "SELECT id FROM sentmsgs WHERE id = (SELECT MAX(id) FROM sentmsgs)")
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return 0
-		}
-		fmt.Println(err)
-		return -1
-	}
-	return id + 1
-}
-
-func NewSentMessage(title string, to string, from string, body string, pass string, reply_to int) SentMessage {
+func NewSentMessage(title string, to string, from string, body string, pass string) SentMessage {
 	return SentMessage{
 		Title:     title,
 		ToEmail:   to,
 		FromEmail: from,
 		Body:      body,
 		Pass:      pass,
-		ReplyTo:   reply_to,
 	}
 }

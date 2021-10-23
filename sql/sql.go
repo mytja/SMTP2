@@ -23,10 +23,13 @@ type SQL interface {
 	NewUser(string, string) error
 	GetUserByEmail(string) (objects.User, error)
 	Commit() error
-	CommitSentMessage(SentMessage) (int64, error)
-	GetSentMessage(int, string) (*SentMessage, error)
-	GetLastSentID() int
-	GetLastReceivedID() int
+	CommitSentMessage(SentMessage) error
+	GetSentMessage(int) (*SentMessage, error)
+	GetLastMessageID() int
+	CommitMessage(message objects.Message) error
+	GetOriginalMessageFromOriginalID(int) (*objects.Message, error)
+	GetOriginalMessageFromReplyTo(int) (*objects.Message, error)
+	GetMessageFromReplyTo(int) (*objects.Message, error)
 }
 
 func NewSQL() (SQL, error) {
