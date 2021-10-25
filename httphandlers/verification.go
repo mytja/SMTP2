@@ -19,13 +19,13 @@ func MessageVerificationHandlers(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(id, q.Get("pass"))
 	pass := q.Get("pass")
 	sentmsg, err := sql.DB.GetSentMessage(id)
-	if sentmsg.Pass != pass {
-		helpers.Write(w, "Failed to verify Message password", http.StatusForbidden)
-		return
-	}
 	if err != nil {
 		fmt.Println(err)
 		helpers.Write(w, "FAIL", http.StatusForbidden)
+		return
+	}
+	if sentmsg.Pass != pass {
+		helpers.Write(w, "Failed to verify Message password", http.StatusForbidden)
 		return
 	}
 	helpers.Write(w, "OK", http.StatusOK)

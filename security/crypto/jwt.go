@@ -55,11 +55,10 @@ func CheckUser(r *http.Request) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-	email := j["email"]
+	email := fmt.Sprint(j["email"])
 	pass := j["pass"]
 	var user objects.User
-	// TODO: Let's make this better...
-	err = sql.DB.GetDB().Get(&user, "SELECT * FROM users WHERE email=$1", email)
+	user, err = sql.DB.GetUserByEmail(email)
 	if err != nil {
 		return false, "", err
 	}
