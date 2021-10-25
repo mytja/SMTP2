@@ -30,6 +30,9 @@ type SQL interface {
 	GetOriginalMessageFromOriginalID(int) (*objects.Message, error)
 	GetOriginalMessageFromReplyTo(int) (*objects.Message, error)
 	GetMessageFromReplyTo(int) (*objects.Message, error)
+	GetOriginalFromReplyHeaders(string, string) (objects.Message, error)
+	DeleteMessage(int) error
+	DeleteSentMessage(int) error
 }
 
 func NewSQL() (SQL, error) {

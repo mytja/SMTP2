@@ -20,6 +20,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	pass := q.Get("ServerPass")
 	replyid := q.Get("ReplyPass")
 	replypass := q.Get("ReplyID")
+	originalid := q.Get("OriginalID")
 	if replyid == "" || replypass == "" {
 		helpers.Write(w, "Bad request", http.StatusBadRequest)
 		return
@@ -30,6 +31,47 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
 		return
 	}
+	originalidint, err := strconv.Atoi(originalid)
+	if err != nil {
+		helpers.Write(w, "OriginalID isn't a valid integer", http.StatusBadRequest)
+		return
+	}
+
+	var isOriginal = false
+
+	originalmessage, err := sql.DB.GetOriginalFromReplyHeaders(replyid, replypass)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			originalidint = -1
+			isOriginal = true
+		} else {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if !isOriginal {
+		if originalmessage.Type == "sent" {
+			originalmsg, err := sql.DB.GetSentMessage(originalmessage.ID)
+			if err != nil {
+				helpers.Write(w, "Unable to retrieve original message from SentMessages.", http.StatusInternalServerError)
+				return
+			}
+			if !(originalmsg.ToEmail == from && originalmsg.FromEmail == to) {
+				helpers.Write(w, "You didn't send this message...", http.StatusNotAcceptable)
+				return
+			}
+		} else {
+			originalmsg, err := sql.DB.GetReceivedMessage(originalmessage.ID)
+			if err != nil {
+				helpers.Write(w, "Unable to retrieve original message from ReceivedMessages.", http.StatusInternalServerError)
+				return
+			}
+			if !(originalmsg.ToEmail == to && originalmsg.FromEmail == from) {
+				helpers.Write(w, "You didn't send this message...", http.StatusNotAcceptable)
+				return
+			}
+		}
+	}
 	_, err = sql.DB.GetUserByEmail(to)
 	if err != nil {
 		helpers.Write(w,
@@ -39,8 +81,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msgid := sql.DB.GetLastMessageID()
-	// TODO: DO NOT MANUALLY INSERT -1
-	basemsg := objects.NewMessage(msgid, -1, atoi, replypass, replyid, "received")
+	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received")
 
 	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass)
 	msg.ID = msgid

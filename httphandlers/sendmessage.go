@@ -72,6 +72,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("ServerPass", msg.Pass)
 	req.Header.Set("ReplyPass", basemsg.ReplyPass)
 	req.Header.Set("ReplyID", basemsg.ReplyID)
+	req.Header.Set("OriginalID", "-1")
 
 	// We have to commit a message before we send a request
 	err = sql.DB.CommitSentMessage(msg)
@@ -107,9 +108,16 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.Write(w, "Error while reading request body", http.StatusInternalServerError)
 			return
 		}
-		helpers.Write(w, helpers.BytearrayToString(body), http.StatusNotAcceptable)
+		helpers.Write(w, helpers.BytearrayToString(body)+"\nMessage has been automatically deleted", http.StatusNotAcceptable)
+		sql.DB.DeleteMessage(basemsg.ID)
+		sql.DB.DeleteSentMessage(msg.ID)
+		return
 	}
 	fmt.Println(req.Header.Get("URI"))
 	fmt.Println(reqdom)
+	if constants.EnableDeletingOnUnknownError {
+		sql.DB.DeleteMessage(basemsg.ID)
+		sql.DB.DeleteSentMessage(msg.ID)
+	}
 	helpers.Write(w, "Unknown error: "+fmt.Sprint(res.StatusCode), http.StatusInternalServerError)
 }

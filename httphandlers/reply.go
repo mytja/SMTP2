@@ -107,6 +107,7 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("ReplyPass", replytomsg.ReplyPass)
 	req.Header.Set("ReplyID", replytomsg.ReplyID)
 	req.Header.Set("ServerID", fmt.Sprint(id))
+	req.Header.Set("OriginalID", fmt.Sprint(originalid))
 	req.Header.Set(
 		"URI",
 		protocol+helpers.GetDomainFromEmail(from)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
@@ -132,9 +133,15 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if res.StatusCode == http.StatusNotAcceptable {
 		helpers.Write(w, helpers.BytearrayToString(body2), http.StatusNotAcceptable)
+		sql.DB.DeleteMessage(basemsg.ID)
+		sql.DB.DeleteSentMessage(reply.ID)
 		return
 	}
 	fmt.Println(req.Header.Get("URI"))
 	fmt.Println(reqdom)
+	if constants.EnableDeletingOnUnknownError {
+		sql.DB.DeleteMessage(basemsg.ID)
+		sql.DB.DeleteSentMessage(reply.ID)
+	}
 	helpers.Write(w, "Unknown error: "+fmt.Sprint(res.StatusCode)+" - "+helpers.BytearrayToString(body2), http.StatusInternalServerError)
 }

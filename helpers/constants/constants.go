@@ -11,6 +11,8 @@ var EnableSmtp2Ssv = true
 var ForceHttps = false
 var ForceHttpsForMailDomain = false
 
+var EnableDeletingOnUnknownError = true
+
 var (
 	ServerUrl string
 	DbName    string

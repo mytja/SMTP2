@@ -31,6 +31,13 @@ func (db *sqlImpl) CommitSentMessage(msg SentMessage) error {
 	return nil
 }
 
+func (db *sqlImpl) DeleteSentMessage(ID int) error {
+	db.GenerateNewTransaction()
+	db.tx.MustExec("DELETE FROM sentmsgs WHERE id=$1", ID)
+	err := db.Commit()
+	return err
+}
+
 func NewSentMessage(title string, to string, from string, body string, pass string) SentMessage {
 	return SentMessage{
 		Title:     title,
