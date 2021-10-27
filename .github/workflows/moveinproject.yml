@@ -14,7 +14,7 @@ jobs:
         with:
           project: In progress
           column: Top priority
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.ACTIONS_REPO_TOKEN }}
   move-lowpriority:
     if: github.event.label.name == 'lowpriority'
     runs-on: ubuntu-latest
@@ -25,4 +25,4 @@ jobs:
         with:
           project: In progress
           column: Low priority
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.ACTIONS_REPO_TOKEN }}
