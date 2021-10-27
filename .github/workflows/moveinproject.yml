@@ -10,7 +10,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: alex-page/github-project-automation-plus@5bcba1c1c091a222584d10913e5c060d32c44044
+      - uses: alex-page/github-project-automation-plus@v0.8.1
         with:
           project: In progress
           column: Top priority
@@ -21,7 +21,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: alex-page/github-project-automation-plus@5bcba1c1c091a222584d10913e5c060d32c44044
+      - uses: alex-page/github-project-automation-plus@v0.8.1
         with:
           project: In progress
           column: Low priority
