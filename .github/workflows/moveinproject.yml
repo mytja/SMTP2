@@ -1,0 +1,28 @@
+name: Move in project
+on:
+  issues:
+    types:
+      - labeled
+jobs:
+  move-toppriority:
+    if: github.event.label.name == 'toppriority'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: alex-page/github-project-automation-plus
+        with:
+          project: In progress
+          column: Top priority
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+  move-lowpriority:
+    if: github.event.label.name == 'lowpriority'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: alex-page/github-project-automation-plus
+        with:
+          project: In progress
+          column: Low priority
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
