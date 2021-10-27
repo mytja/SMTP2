@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt"
 	"github.com/mytja/SMTP2/helpers/constants"
-	"github.com/mytja/SMTP2/objects"
-	"github.com/mytja/SMTP2/sql"
 	"net/http"
+	"time"
 )
 
 func GetJWTFromUserPass(email string, pass string) (string, error) {
 	// IMPORTANT: Password MUST BE hashed
 
+	expirationTime := time.Now().Add(24 * time.Hour)
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": email,
 		"iss":   constants.JwtIssuer,
-		//"exp": 3 * 24 * 60 * 60,
+		"exp":   expirationTime.Unix(),
 	})
 
 	// Sign and get the complete encoded token as a string using the secret
@@ -56,14 +57,5 @@ func CheckUser(r *http.Request) (bool, string, error) {
 		return false, "", err
 	}
 	email := fmt.Sprint(j["email"])
-	pass := j["pass"]
-	var user objects.User
-	user, err = sql.DB.GetUserByEmail(email)
-	if err != nil {
-		return false, "", err
-	}
-	if pass == user.Password {
-		return true, user.Email, nil
-	}
-	return false, "", nil
+	return true, email, nil
 }
