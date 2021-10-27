@@ -2,6 +2,7 @@ package httphandlers
 
 import (
 	"fmt"
+	"github.com/jpillora/go-tld"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/objects"
 	"github.com/mytja/SMTP2/security"
@@ -83,7 +84,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	msgid := sql.DB.GetLastMessageID()
 	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received")
 
-	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass)
+	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass, "")
 	msg.ID = msgid
 
 	verification, _ := security.VerifyMessage(msg)
@@ -91,6 +92,22 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Failed to verify message.", http.StatusForbidden)
 		return
 	}
+	fromurl, err := tld.Parse(helpers.GetDomainFromEmail(from))
+	if err != nil {
+		msg.Warning = "SMTP2_FAILED_TO_PARSE_EMAIL_ADDRESS_AS_URI"
+	}
+	requrl, err := tld.Parse(uri)
+	if err != nil {
+		msg.Warning = "SMTP2_FAILED_TO_PARSE_DOMAIN_AS_URI"
+	}
+	if requrl != nil && fromurl != nil {
+		fmt.Println(fromurl.Domain)
+		if requrl.Domain != fromurl.Domain {
+			msg.Warning = "SMTP2_DOMAINS_NOT_MATCHING"
+		}
+	}
+
+	// Commit
 	err = sql.DB.CommitMessage(basemsg)
 	if err != nil {
 		helpers.Write(w, fmt.Sprint("Failed commiting base message to database", err.Error()), http.StatusInternalServerError)

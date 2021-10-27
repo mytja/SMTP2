@@ -10,6 +10,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.0
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/jpillora/go-tld v1.1.1 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

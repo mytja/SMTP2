@@ -7,6 +7,7 @@ type SentMessage struct {
 	ToEmail   string `db:"to_email"`
 	FromEmail string `db:"from_email"`
 	Pass      string
+	IsDraft   bool `db:"is_draft"`
 }
 
 func (db *sqlImpl) GetSentMessage(id int) (*SentMessage, error) {
@@ -22,7 +23,7 @@ func (db *sqlImpl) GetSentMessage(id int) (*SentMessage, error) {
 
 func (db *sqlImpl) CommitSentMessage(msg SentMessage) error {
 	_, err := db.tx.NamedExec(
-		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass) VALUES (:id, :title, :body, :to_email, :from_email, :pass)",
+		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass, is_draft) VALUES (:id, :title, :body, :to_email, :from_email, :pass, :is_draft)",
 		msg)
 	err = db.Commit()
 	if err != nil {
@@ -45,5 +46,6 @@ func NewSentMessage(title string, to string, from string, body string, pass stri
 		FromEmail: from,
 		Body:      body,
 		Pass:      pass,
+		IsDraft:   false,
 	}
 }

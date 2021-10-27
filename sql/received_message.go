@@ -12,6 +12,7 @@ type ReceivedMessage struct {
 	FromEmail  string `db:"from_email"`
 	ServerID   int    `db:"server_id"`   // This is used to get specific message from server
 	ServerPass string `db:"server_pass"` // This is password used to access this email from server
+	Warning    string
 }
 
 func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
@@ -37,7 +38,7 @@ func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 }
 
 func NewReceivedMessage(
-	title string, URI string, to string, from string, id int, pass string) ReceivedMessage {
+	title string, URI string, to string, from string, id int, pass string, warning string) ReceivedMessage {
 	return ReceivedMessage{
 		Title:      title,
 		URI:        URI,
@@ -45,5 +46,6 @@ func NewReceivedMessage(
 		FromEmail:  from,
 		ServerID:   id,
 		ServerPass: pass,
+		Warning:    warning,
 	}
 }

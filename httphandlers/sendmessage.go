@@ -60,6 +60,9 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	domain := helpers.GetDomainFromEmail(msg.ToEmail)
 	fmt.Println(domain)
 
+	idstring := fmt.Sprint(id)
+	fmt.Println("ID2: ", idstring)
+
 	protocol := "http://"
 	if constants.ForceHttps {
 		protocol = "https://"
@@ -73,6 +76,11 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("ReplyPass", basemsg.ReplyPass)
 	req.Header.Set("ReplyID", basemsg.ReplyID)
 	req.Header.Set("OriginalID", "-1")
+	req.Header.Set("ServerID", fmt.Sprint(idstring))
+	req.Header.Set(
+		"URI",
+		protocol+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
+	)
 
 	// We have to commit a message before we send a request
 	err = sql.DB.CommitSentMessage(msg)
@@ -81,15 +89,6 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idstring := fmt.Sprint(id)
-	fmt.Println("ID2: ", idstring)
-
-	req.Header.Set("ServerID", fmt.Sprint(idstring))
-	req.Header.Set(
-		"URI",
-		protocol+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
-	)
-
 	//time.Sleep(1 * time.Second)
 
 	res, err := http.DefaultClient.Do(req)
@@ -97,6 +96,8 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusForbidden)
 		return
 	}
+	body3, _ := ioutil.ReadAll(res.Body)
+	fmt.Println(helpers.BytearrayToString(body3))
 	if res.StatusCode == http.StatusCreated {
 		// And let's make a 201 response
 		helpers.Write(w, "OK", http.StatusCreated)
