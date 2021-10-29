@@ -91,14 +91,23 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Now let's send a request to a recipient email server
-	domain := helpers.GetDomainFromEmail(to)
-	fmt.Println(domain)
+	todomain, err := helpers.GetDomainFromEmail(to)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fromdomain, err := helpers.GetDomainFromEmail(from)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fmt.Println(todomain)
 
 	protocol := "http://"
 	if constants.ForceHttps {
 		protocol = "https://"
 	}
-	reqdom := protocol + domain + "/smtp2/message/receive"
+	reqdom := protocol + todomain + "/smtp2/message/receive"
 	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
 	req.Header.Set("Title", title)
 	req.Header.Set("To", to)
@@ -110,7 +119,7 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("OriginalID", fmt.Sprint(originalid))
 	req.Header.Set(
 		"URI",
-		protocol+helpers.GetDomainFromEmail(from)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
+		protocol+fromdomain+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
 	)
 
 	//time.Sleep(1 * time.Second)

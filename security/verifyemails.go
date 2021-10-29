@@ -38,7 +38,10 @@ func VerifyEmailServer(mail sql.ReceivedMessage) error {
 }
 
 func VerifyEmailSender(mail sql.ReceivedMessage) error {
-	domain := helpers.GetDomainFromEmail(mail.FromEmail)
+	domain, err := helpers.GetDomainFromEmail(mail.FromEmail)
+	if err != nil {
+		return err
+	}
 	fmt.Println(domain)
 	id := fmt.Sprint(mail.ServerID)
 	protocol := "http://"
@@ -72,6 +75,6 @@ func VerifyMessage(mail sql.ReceivedMessage) (bool, error) {
 		return false, sendererr
 	}
 	servererr := VerifyEmailServer(mail)
-	fmt.Println(servererr)
+	fmt.Println("SERVER_ERR", servererr)
 	return servererr == nil, servererr
 }

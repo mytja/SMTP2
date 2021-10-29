@@ -37,10 +37,15 @@ func NewUser(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Bad Request. A parameter isn't provided", http.StatusBadRequest)
 		return
 	}
+	_, err := helpers.GetDomainFromEmail(email)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	// Check if user is already in DB
 	var user objects.User
 	var userCreated = true
-	err := sql.DB.GetDB().Get(&user, "SELECT * FROM users WHERE email=$1", email)
+	err = sql.DB.GetDB().Get(&user, "SELECT * FROM users WHERE email=$1", email)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			userCreated = false

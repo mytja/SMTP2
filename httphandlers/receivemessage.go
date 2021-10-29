@@ -64,6 +64,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			originalmsg, err := sql.DB.GetReceivedMessage(originalmessage.ID)
 			if err != nil {
+				fmt.Println(err)
 				helpers.Write(w, "Unable to retrieve original message from ReceivedMessages.", http.StatusInternalServerError)
 				return
 			}
@@ -92,7 +93,12 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Failed to verify message.", http.StatusForbidden)
 		return
 	}
-	fromurl, err := tld.Parse(helpers.GetDomainFromEmail(from))
+	domain, err := helpers.GetDomainFromEmail(from)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fromurl, err := tld.Parse(domain)
 	if err != nil {
 		msg.Warning = "SMTP2_FAILED_TO_PARSE_EMAIL_ADDRESS_AS_URI"
 	}

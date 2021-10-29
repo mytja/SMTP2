@@ -26,7 +26,7 @@ func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
 
 func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass)",
+		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning)",
 		msg)
 	err = db.Commit()
 	if err != nil {

@@ -57,8 +57,17 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(msg.ID)
 
 	// Now let's send a request to a recipient email server
-	domain := helpers.GetDomainFromEmail(msg.ToEmail)
-	fmt.Println(domain)
+	todomain, err := helpers.GetDomainFromEmail(msg.ToEmail)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fromdomain, err := helpers.GetDomainFromEmail(msg.FromEmail)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fmt.Println(todomain)
 
 	idstring := fmt.Sprint(id)
 	fmt.Println("ID2: ", idstring)
@@ -67,7 +76,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	if constants.ForceHttps {
 		protocol = "https://"
 	}
-	reqdom := protocol + domain + "/smtp2/message/receive"
+	reqdom := protocol + todomain + "/smtp2/message/receive"
 	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
 	req.Header.Set("Title", msg.Title)
 	req.Header.Set("To", msg.ToEmail)
@@ -79,7 +88,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("ServerID", fmt.Sprint(idstring))
 	req.Header.Set(
 		"URI",
-		protocol+helpers.GetDomainFromEmail(msg.FromEmail)+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
+		protocol+fromdomain+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
 	)
 
 	// We have to commit a message before we send a request

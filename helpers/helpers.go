@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,10 +13,15 @@ func Write(w http.ResponseWriter, text string, status int) (int, error) {
 	return i, err
 }
 
-func GetDomainFromEmail(email string) string {
+func GetDomainFromEmail(email string) (string, error) {
 	strs := strings.Split(email, "@")
+	if len(strs) > 2 {
+		return "", errors.New("string contains too much @ symbols - invalid email address")
+	} else if len(strs) == 1 {
+		return "", errors.New("string isn't a valid email address - no @ symbol was found")
+	}
 	tld := strs[len(strs)-1]
-	return tld
+	return tld, nil
 }
 
 func GetHostnameFromURI(uri string) (string, error) {
