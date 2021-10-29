@@ -33,6 +33,8 @@ type SQL interface {
 	GetOriginalFromReplyHeaders(string, string) (objects.Message, error)
 	DeleteMessage(int) error
 	DeleteSentMessage(int) error
+	UpdateDraftSentMessage(SentMessage) error
+	UpdateDraftMessage(objects.Message) error
 }
 
 func NewSQL() (SQL, error) {

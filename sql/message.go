@@ -23,7 +23,7 @@ func (db *sqlImpl) GetLastMessageID() int {
 
 func (db *sqlImpl) CommitMessage(msg objects.Message) error {
 	_, err := db.tx.NamedExec(
-		"INSERT INTO messages (id, original_id, server_id, reply_pass, reply_id, type) VALUES (:id, :original_id, :server_id, :reply_pass, :reply_id, :type)",
+		"INSERT INTO messages (id, original_id, server_id, reply_pass, reply_id, type, is_draft) VALUES (:id, :original_id, :server_id, :reply_pass, :reply_id, :type, :is_draft)",
 		msg)
 	if err != nil {
 		return err
@@ -90,4 +90,16 @@ func (db *sqlImpl) DeleteMessage(ID int) error {
 	db.tx.MustExec("DELETE FROM messages WHERE id=$1", ID)
 	err := db.Commit()
 	return err
+}
+
+func (db *sqlImpl) IsMessageInDatabase(mID int) (bool, *objects.Message, error) {
+	var message objects.Message
+	err := db.db.Get(&message, "SELECT * FROM messages WHERE id=$1", mID)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return false, nil, nil
+		}
+		return false, nil, err
+	}
+	return true, &message, nil
 }

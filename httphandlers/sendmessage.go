@@ -10,6 +10,7 @@ import (
 	"github.com/mytja/SMTP2/sql"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -17,10 +18,8 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	to := r.FormValue("To")
 	body := r.FormValue("Body")
-	if !strings.Contains(to, "@") {
-		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
-		return
-	}
+	usedraft := r.FormValue("DraftID")
+
 	ok, from, err := crypto2.CheckUser(r)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -30,6 +29,51 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Forbidden", http.StatusForbidden)
 		return
 	}
+
+	var iscreatedfromdraft = false
+	var originalid = -1
+	var serverid = -1
+	id := sql.DB.GetLastMessageID()
+
+	if usedraft != "" {
+		draftid, err := strconv.Atoi(usedraft)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		message, err := sql.DB.GetSentMessage(draftid)
+		if err != nil {
+			helpers.Write(w, "Failed to retrieve draft from database", http.StatusInternalServerError)
+			return
+		}
+		if message.FromEmail != from {
+			helpers.Write(w, "You didn't create this draft...", http.StatusForbidden)
+			return
+		}
+		basemsg, err := sql.DB.GetMessageFromReplyTo(draftid)
+		if err != nil {
+			helpers.Write(w, "Failed to retrieve draft base from database", http.StatusInternalServerError)
+			return
+		}
+		if !basemsg.IsDraft {
+			helpers.Write(w, "This isn't a draft anymore...", http.StatusBadRequest)
+			return
+		}
+		iscreatedfromdraft = true
+		serverid = basemsg.ServerID
+		originalid = basemsg.OriginalID
+
+		title = message.Title
+		body = message.Body
+		to = message.ToEmail
+		id = message.ID
+	}
+
+	if !strings.Contains(to, "@") {
+		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
+		return
+	}
+
 	pass, err := security.GenerateRandomString(50)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -45,16 +89,28 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id := sql.DB.GetLastMessageID()
-	basemsg := objects.NewMessage(id, -1, -1, replyPass, replyID, "sent")
-	err = sql.DB.CommitMessage(basemsg)
-	if err != nil {
-		helpers.Write(w, fmt.Sprint("Error while committing to database: ", err.Error()), http.StatusInternalServerError)
-		return
+	basemsg := objects.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
+	if iscreatedfromdraft {
+		// Update instead of pushing
+		err := sql.DB.UpdateDraftMessage(basemsg)
+		if err != nil {
+			helpers.Write(w, fmt.Sprint("Error while committing to database: ", err.Error()), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err = sql.DB.CommitMessage(basemsg)
+		if err != nil {
+			helpers.Write(w, fmt.Sprint("Error while committing to database: ", err.Error()), http.StatusInternalServerError)
+			return
+		}
 	}
+	fmt.Println(basemsg)
+
 	msg := sql.NewSentMessage(title, to, from, body, pass)
 	msg.ID = id
 	fmt.Println(msg.ID)
+
+	fmt.Println(msg)
 
 	// Now let's send a request to a recipient email server
 	todomain, err := helpers.GetDomainFromEmail(msg.ToEmail)
@@ -92,10 +148,18 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	// We have to commit a message before we send a request
-	err = sql.DB.CommitSentMessage(msg)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
+	if iscreatedfromdraft {
+		err = sql.DB.UpdateDraftSentMessage(msg)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err = sql.DB.CommitSentMessage(msg)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	//time.Sleep(1 * time.Second)

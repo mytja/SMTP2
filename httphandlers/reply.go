@@ -49,7 +49,7 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := sql.DB.GetLastMessageID()
-	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent")
+	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
 	err = sql.DB.CommitMessage(basemsg)
 	if err != nil {
 		helpers.Write(w, "Failed while committing message base", http.StatusInternalServerError)

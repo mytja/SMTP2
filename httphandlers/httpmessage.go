@@ -51,12 +51,12 @@ func GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	message, err := sql.DB.GetSentMessage(id)
-	if message.Pass != pass {
-		helpers.Write(w, "Could not confirm Message password", http.StatusForbidden)
-		return
-	}
 	if err != nil {
 		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	if message.Pass != pass {
+		helpers.Write(w, "Could not confirm Message password", http.StatusForbidden)
 		return
 	}
 	var m = make(map[string]string)

@@ -83,7 +83,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msgid := sql.DB.GetLastMessageID()
-	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received")
+	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received", false)
 
 	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass, "")
 	msg.ID = msgid
