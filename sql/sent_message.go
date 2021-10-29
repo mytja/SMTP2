@@ -25,6 +25,9 @@ func (db *sqlImpl) CommitSentMessage(msg SentMessage) error {
 	_, err := db.tx.NamedExec(
 		"INSERT INTO sentmsgs (id, title, body, to_email, from_email, pass, is_draft) VALUES (:id, :title, :body, :to_email, :from_email, :pass, :is_draft)",
 		msg)
+	if err != nil {
+		return err
+	}
 	err = db.Commit()
 	if err != nil {
 		return err

@@ -10,3 +10,7 @@ func NewDraft(title string, to string, from string, body string) SentMessage {
 		IsDraft:   true,
 	}
 }
+
+func (db *sqlImpl) CommitDraftMessage(draft SentMessage) error {
+	return nil
+}
