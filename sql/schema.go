@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS messages (
 	type         VARCHAR(10)   NOT NULL,
 	is_draft     BOOLEAN       NOT NULL
 );
+CREATE TABLE IF NOT EXISTS attachments (
+	id                INTEGER       PRIMARY KEY,
+	original_name     VARCHAR(100)  NOT NULL,
+	filename          VARCHAR(100)  NOT NULL,
+	message_id        INTEGER       NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sentmsgs (
 	id           INTEGER       PRIMARY KEY,
     to_email     VARCHAR(250)  NOT NULL,

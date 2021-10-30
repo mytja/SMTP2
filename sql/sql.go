@@ -35,6 +35,8 @@ type SQL interface {
 	DeleteSentMessage(int) error
 	UpdateDraftSentMessage(SentMessage) error
 	UpdateDraftMessage(objects.Message) error
+	CommitAttachment(Attachment) error
+	GetLastAttachmentID() int
 }
 
 func NewSQL() (SQL, error) {

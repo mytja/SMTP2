@@ -82,6 +82,9 @@ func main() {
 	r.HandleFunc("/smtp2/draft/new", httphandlers.NewDraft).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/draft/save", httphandlers.UpdateDraft).Methods(httphandlers.POST)
 
+	// Attachment handling
+	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandlers.UploadFile).Methods(httphandlers.POST)
+
 	// User functions
 	r.HandleFunc("/user/new", httphandlers.NewUser).Methods(httphandlers.POST)
 	r.HandleFunc("/user/login", httphandlers.Login).Methods(httphandlers.POST)

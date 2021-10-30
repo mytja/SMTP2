@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -30,4 +31,8 @@ func GetHostnameFromURI(uri string) (string, error) {
 		return "", err
 	}
 	return u.Scheme + "://" + u.Host, err
+}
+
+func GetFileExtension(filename string) string {
+	return filepath.Ext(filename)
 }
