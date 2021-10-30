@@ -29,6 +29,7 @@ func GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if message.ToEmail != email {
 		helpers.Write(w, "unauthenticated", http.StatusForbidden)
+		return
 	}
 	var m map[string]string
 	m["ID"] = fmt.Sprint(message.ID)
@@ -53,6 +54,15 @@ func GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 	message, err := sql.DB.GetSentMessage(id)
 	if err != nil {
 		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	basemessage, err := sql.DB.GetOriginalMessageFromOriginalID(id)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve base message from database: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	if basemessage.IsDraft {
+		helpers.Write(w, "This message is a draft and therefore, we should not give you any information.", http.StatusForbidden)
 		return
 	}
 	if message.Pass != pass {

@@ -95,6 +95,19 @@ func UpdateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	basemsg, err := sql.DB.GetOriginalMessageFromOriginalID(idint)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve base draft message from database", http.StatusInternalServerError)
+		return
+	}
+	if !basemsg.IsDraft {
+		helpers.Write(w,
+			"This message isn't a draft anymore...\nYour changes were denied, but you can use a different endpoint",
+			http.StatusNotAcceptable,
+		)
+		return
+	}
+
 	sentmsg := sql.NewDraftSentMessage(idint, title, to, from, body)
 
 	err = sql.DB.UpdateDraftSentMessage(sentmsg)
