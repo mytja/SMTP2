@@ -3,24 +3,28 @@ package sql
 import "fmt"
 
 type Attachment struct {
-	ID           int
-	MessageID    int    `db:"message_id"`
-	OriginalName string `db:"original_name"`
-	Filename     string
+	ID             int
+	MessageID      int    `db:"message_id"`
+	OriginalName   string `db:"original_name"`
+	Filename       string
+	AttachmentPass string `db:"attachment_pass"`
+	Type           string
 }
 
-func NewAttachment(ID int, MessageID int, OriginalName string, Filename string) Attachment {
+func NewAttachment(ID int, MessageID int, OriginalName string, Filename string, Pass string, Type string) Attachment {
 	return Attachment{
-		ID:           ID,
-		MessageID:    MessageID,
-		OriginalName: OriginalName,
-		Filename:     Filename,
+		ID:             ID,
+		MessageID:      MessageID,
+		OriginalName:   OriginalName,
+		Filename:       Filename,
+		AttachmentPass: Pass,
+		Type:           Type,
 	}
 }
 
 func (db *sqlImpl) CommitAttachment(attachment Attachment) error {
 	_, err := db.tx.NamedExec(
-		"INSERT INTO attachments (id, message_id, original_name, filename) VALUES (:id, :message_id, :original_name, :filename)",
+		"INSERT INTO attachments (id, message_id, original_name, filename, attachment_pass, type) VALUES (:id, :message_id, :original_name, :filename, :attachment_pass, :type)",
 		attachment)
 	if err != nil {
 		return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
+	"github.com/mytja/SMTP2/security"
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io"
@@ -47,10 +48,20 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pass, err := security.GenerateRandomString(80)
+	if err != nil {
+		helpers.Write(
+			w,
+			"Failed to generate random password. This is completely server's fault",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
 	lastattachmentid := sql.DB.GetLastAttachmentID()
 	fileext := helpers.GetFileExtension(handler.Filename)
 	filename := "attachments/" + id + "/" + fmt.Sprint(lastattachmentid) + fileext
-	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename)
+	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename, pass, "sent")
 
 	defer file.Close()
 
@@ -237,4 +248,30 @@ func GetAttachment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func RetrieveAttachment(w http.ResponseWriter, r *http.Request) {}
+func RetrieveAttachment(w http.ResponseWriter, r *http.Request) {
+	mid := mux.Vars(r)["mid"]
+	midint, err := strconv.Atoi(mid)
+	if err != nil {
+		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		return
+	}
+
+	aid := mux.Vars(r)["aid"]
+	aidint, err := strconv.Atoi(aid)
+	if err != nil {
+		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		return
+	}
+
+	pass := r.URL.Query().Get("pass")
+
+	attachment, err := sql.DB.GetAttachment(midint, aidint)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if attachment.AttachmentPass != pass {
+		helpers.Write(w, err.Error(), http.StatusForbidden)
+		return
+	}
+}
