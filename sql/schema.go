@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS attachments (
 	id                INTEGER       PRIMARY KEY,
 	original_name     VARCHAR(100)  NOT NULL,
 	filename          VARCHAR(100)  NOT NULL,
-	message_id        INTEGER       NOT NULL
+	message_id        INTEGER       NOT NULL,
+	attachment_pass   VARCHAR(100)  NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sentmsgs (
 	id           INTEGER       PRIMARY KEY,

@@ -84,6 +84,8 @@ func main() {
 
 	// Attachment handling
 	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandlers.UploadFile).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandlers.DeleteAttachment).Methods(httphandlers.DELETE)
+	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandlers.GetAttachment).Methods(httphandlers.GET)
 
 	// User functions
 	r.HandleFunc("/user/new", httphandlers.NewUser).Methods(httphandlers.POST)

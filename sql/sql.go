@@ -37,6 +37,8 @@ type SQL interface {
 	UpdateDraftMessage(objects.Message) error
 	CommitAttachment(Attachment) error
 	GetLastAttachmentID() int
+	GetAttachment(int, int) (*Attachment, error)
+	DeleteAttachment(int, int) error
 }
 
 func NewSQL() (SQL, error) {

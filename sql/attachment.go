@@ -34,7 +34,7 @@ func (db *sqlImpl) CommitAttachment(attachment Attachment) error {
 
 func (db *sqlImpl) GetLastAttachmentID() int {
 	var id int
-	err := DB.GetDB().Get(&id, "SELECT id FROM attachments WHERE id = (SELECT MAX(id) FROM attachments)")
+	err := db.db.Get(&id, "SELECT id FROM attachments WHERE id = (SELECT MAX(id) FROM attachments)")
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return 0
@@ -43,4 +43,19 @@ func (db *sqlImpl) GetLastAttachmentID() int {
 		return -1
 	}
 	return id + 1
+}
+
+func (db *sqlImpl) GetAttachment(mid int, aid int) (*Attachment, error) {
+	var attachment Attachment
+
+	err := db.db.Get(&attachment, "SELECT * FROM attachments WHERE message_id=$1 AND id=$2", mid, aid)
+	if err != nil {
+		return nil, err
+	}
+	return &attachment, nil
+}
+
+func (db *sqlImpl) DeleteAttachment(mid int, aid int) error {
+	_, err := db.db.Exec("DELETE FROM attachments WHERE message_id=$1 AND id=$2", mid, aid)
+	return err
 }
