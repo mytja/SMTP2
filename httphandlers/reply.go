@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-// TODO: Disable anyone with JWT to reply.
+// Disable anyone with JWT to reply. (remote server does that for us - not TO DO anymore)
 func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
@@ -96,17 +96,18 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fromdomain, err := helpers.GetDomainFromEmail(from)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	server.logger.Info(todomain)
 
 	protocol := "http://"
 	if constants.ForceHttps {
 		protocol = "https://"
 	}
+
+	urlprotocol := "http://"
+	if server.config.HTTPSEnabled {
+		urlprotocol = "https://"
+	}
+
 	reqdom := protocol + todomain + "/smtp2/message/receive"
 	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
 	req.Header.Set("Title", title)
@@ -119,7 +120,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	req.Header.Set("OriginalID", fmt.Sprint(originalid))
 	req.Header.Set(
 		"URI",
-		protocol+fromdomain+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
+		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
 	)
 
 	//time.Sleep(1 * time.Second)
@@ -141,6 +142,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if res.StatusCode == http.StatusNotAcceptable {
+		server.logger.Error("Server has denied message")
 		helpers.Write(w, helpers.BytearrayToString(body2), http.StatusNotAcceptable)
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
