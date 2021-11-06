@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/helpers/constants"
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
@@ -71,13 +70,8 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	fromdomain, err := helpers.GetDomainFromEmail(message.FromEmail)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	protocol := "http://"
-	if constants.ForceHttps {
+	if server.config.HTTPSEnabled {
 		protocol = "https://"
 	}
 
@@ -92,7 +86,7 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 		var attachment = make(map[string]interface{})
 		attachment["ID"] = att.ID
 		attachment["Filename"] = att.ID
-		attachment["URL"] = protocol + fromdomain + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass
+		attachment["URL"] = protocol + server.config.HostURL + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass
 		attachmentsmap = append(attachmentsmap, attachment)
 	}
 	var m = make(map[string]interface{})

@@ -118,11 +118,6 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fromdomain, err := helpers.GetDomainFromEmail(msg.FromEmail)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	server.logger.Info(todomain)
 
 	idstring := fmt.Sprint(id)
@@ -133,6 +128,12 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		protocol = "https://"
 	}
 	reqdom := protocol + todomain + "/smtp2/message/receive"
+
+	urlprotocol := "http://"
+	if server.config.HTTPSEnabled {
+		urlprotocol = "https://"
+	}
+
 	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
 	req.Header.Set("Title", msg.Title)
 	req.Header.Set("To", msg.ToEmail)
@@ -144,7 +145,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	req.Header.Set("ServerID", fmt.Sprint(idstring))
 	req.Header.Set(
 		"URI",
-		protocol+fromdomain+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
+		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
 	)
 
 	// We have to commit a message before we send a request

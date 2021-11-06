@@ -28,10 +28,16 @@ func main() {
 	command.Flags().StringVar(&config.Port, "port", "8080", "set server port")
 	command.Flags().StringVar(&constants.ServerUrl, "url", "http://0.0.0.0:8080", "set server URL")
 	command.Flags().StringVar(&constants.DbName, "dbname", "smtp2.db", "set DB name")
+	command.Flags().StringVar(&config.HostURL, "hosturl", "", "What should be shown after @ symbol")
+	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return
+	}
+	if config.HostURL == "" {
+		// This means it's running in localhost
+		config.HostURL = config.Host + ":" + config.Port
 	}
 
 	var logger *zap.Logger
