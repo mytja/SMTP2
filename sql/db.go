@@ -2,11 +2,6 @@ package sql
 
 import "github.com/jmoiron/sqlx"
 
-var (
-	DB    SQL
-	DBERR error
-)
-
 func (db *sqlImpl) Init() {
 	db.db.MustExec(schema)
 }

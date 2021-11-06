@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
@@ -12,16 +13,10 @@ import (
 	"os"
 )
 
-type ServerConfig struct {
-	Debug bool
-	Host  string
-	Port  string
-}
-
 func main() {
 	fmt.Println("Starting SMTP2 server...")
 
-	config := ServerConfig{}
+	config := helpers.ServerConfig{}
 
 	command := &cobra.Command{
 		Use:   "SMTP2-server",
@@ -55,13 +50,15 @@ func main() {
 
 	sugared := logger.Sugar()
 
-	sql.DB, sql.DBERR = sql.NewSQL()
-	sql.DB.Init()
+	db, err := sql.NewSQL()
+	db.Init()
 
-	if sql.DBERR != nil {
-		sugared.Fatal("Error while creating database: " + sql.DBERR.Error())
+	if err != nil {
+		sugared.Fatal("Error while creating database: " + err.Error())
 		return
 	}
+
+	httphandler := httphandlers.NewHTTPInterface(sugared, db, config)
 
 	sugared.Info("Database created successfully")
 
@@ -69,30 +66,31 @@ func main() {
 	r.HandleFunc("/smtp2", httphandlers.WelcomeHandler).Methods(httphandlers.GET)
 
 	// Message & replying
-	r.HandleFunc("/smtp2/message/receive", httphandlers.ReceiveMessageHandler).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/message/new", httphandlers.NewMessageHandler).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/message/inbox", httphandlers.GetInboxHandler).Methods(httphandlers.GET)
-	r.HandleFunc("/smtp2/message/reply/{id}", httphandlers.NewReplyHandler).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/message/receive", httphandler.ReceiveMessageHandler).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/message/new", httphandler.NewMessageHandler).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/message/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	// Get message from receiver server (ReceivedMessage)
-	r.HandleFunc("/smtp2/message/inbox/get/{id}", httphandlers.GetReceivedMessageHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/inbox/get/{id}", httphandler.GetReceivedMessageHandler).Methods(httphandlers.GET)
 	// Get message from sender server (SentMessage)
-	r.HandleFunc("/smtp2/message/get/{id}", httphandlers.GetSentMessageHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/get/{id}", httphandler.GetSentMessageHandler).Methods(httphandlers.GET)
 
 	// Drafts
-	r.HandleFunc("/smtp2/draft/new", httphandlers.NewDraft).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/draft/save", httphandlers.UpdateDraft).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/draft/new", httphandler.NewDraft).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/draft/save", httphandler.UpdateDraft).Methods(httphandlers.POST)
 
 	// Attachment handling
-	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandlers.UploadFile).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandlers.DeleteAttachment).Methods(httphandlers.DELETE)
-	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandlers.GetAttachment).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandler.UploadFile).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.DeleteAttachment).Methods(httphandlers.DELETE)
+	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.GetAttachment).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/attachment/retrieve/{mid}/{aid}", httphandler.RetrieveAttachment).Methods(httphandlers.GET)
 
 	// User functions
-	r.HandleFunc("/user/new", httphandlers.NewUser).Methods(httphandlers.POST)
-	r.HandleFunc("/user/login", httphandlers.Login).Methods(httphandlers.POST)
+	r.HandleFunc("/user/new", httphandler.NewUser).Methods(httphandlers.POST)
+	r.HandleFunc("/user/login", httphandler.Login).Methods(httphandlers.POST)
 
 	// SMTP2 Sender Server Verification Protocol
-	r.HandleFunc("/smtp2/message/verify", httphandlers.MessageVerificationHandlers).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/verify", httphandler.MessageVerificationHandlers).Methods(httphandlers.GET)
 
 	sugared.Info("Serving...")
 	serve := config.Host + ":" + config.Port

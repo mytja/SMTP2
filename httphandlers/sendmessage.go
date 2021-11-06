@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	to := r.FormValue("To")
 	body := r.FormValue("Body")
@@ -33,7 +33,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	var iscreatedfromdraft = false
 	var originalid = -1
 	var serverid = -1
-	id := sql.DB.GetLastMessageID()
+	id := server.db.GetLastMessageID()
 
 	if usedraft != "" {
 		draftid, err := strconv.Atoi(usedraft)
@@ -41,7 +41,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.Write(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		message, err := sql.DB.GetSentMessage(draftid)
+		message, err := server.db.GetSentMessage(draftid)
 		if err != nil {
 			helpers.Write(w, "Failed to retrieve draft from database", http.StatusInternalServerError)
 			return
@@ -50,7 +50,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.Write(w, "You didn't create this draft...", http.StatusForbidden)
 			return
 		}
-		basemsg, err := sql.DB.GetMessageFromReplyTo(draftid)
+		basemsg, err := server.db.GetMessageFromReplyTo(draftid)
 		if err != nil {
 			helpers.Write(w, "Failed to retrieve draft base from database", http.StatusInternalServerError)
 			return
@@ -92,25 +92,25 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	basemsg := objects.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
 	if iscreatedfromdraft {
 		// Update instead of pushing
-		err := sql.DB.UpdateDraftMessage(basemsg)
+		err := server.db.UpdateDraftMessage(basemsg)
 		if err != nil {
 			helpers.Write(w, fmt.Sprint("Error while committing to database: ", err.Error()), http.StatusInternalServerError)
 			return
 		}
 	} else {
-		err = sql.DB.CommitMessage(basemsg)
+		err = server.db.CommitMessage(basemsg)
 		if err != nil {
 			helpers.Write(w, fmt.Sprint("Error while committing to database: ", err.Error()), http.StatusInternalServerError)
 			return
 		}
 	}
-	fmt.Println(basemsg)
+	server.logger.Info(basemsg)
 
 	msg := sql.NewSentMessage(title, to, from, body, pass)
 	msg.ID = id
-	fmt.Println(msg.ID)
+	server.logger.Info(msg.ID)
 
-	fmt.Println(msg)
+	server.logger.Info(msg)
 
 	// Now let's send a request to a recipient email server
 	todomain, err := helpers.GetDomainFromEmail(msg.ToEmail)
@@ -123,10 +123,10 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println(todomain)
+	server.logger.Info(todomain)
 
 	idstring := fmt.Sprint(id)
-	fmt.Println("ID2: ", idstring)
+	server.logger.Info("ID2: ", idstring)
 
 	protocol := "http://"
 	if constants.ForceHttps {
@@ -149,13 +149,13 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	// We have to commit a message before we send a request
 	if iscreatedfromdraft {
-		err = sql.DB.UpdateDraftSentMessage(msg)
+		err = server.db.UpdateDraftSentMessage(msg)
 		if err != nil {
 			helpers.Write(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	} else {
-		err = sql.DB.CommitSentMessage(msg)
+		err = server.db.CommitSentMessage(msg)
 		if err != nil {
 			helpers.Write(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -170,7 +170,7 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body3, _ := ioutil.ReadAll(res.Body)
-	fmt.Println(helpers.BytearrayToString(body3))
+	server.logger.Info(helpers.BytearrayToString(body3))
 	if res.StatusCode == http.StatusCreated {
 		// And let's make a 201 response
 		helpers.Write(w, "OK", http.StatusCreated)
@@ -183,15 +183,15 @@ func NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.Write(w, helpers.BytearrayToString(body)+"\nMessage has been automatically deleted", http.StatusNotAcceptable)
-		sql.DB.DeleteMessage(basemsg.ID)
-		sql.DB.DeleteSentMessage(msg.ID)
+		server.db.DeleteMessage(basemsg.ID)
+		server.db.DeleteSentMessage(msg.ID)
 		return
 	}
-	fmt.Println(req.Header.Get("URI"))
-	fmt.Println(reqdom)
+	server.logger.Info(req.Header.Get("URI"))
+	server.logger.Info(reqdom)
 	if constants.EnableDeletingOnUnknownError {
-		sql.DB.DeleteMessage(basemsg.ID)
-		sql.DB.DeleteSentMessage(msg.ID)
+		server.db.DeleteMessage(basemsg.ID)
+		server.db.DeleteSentMessage(msg.ID)
 	}
 	helpers.Write(w, "Unknown error: "+fmt.Sprint(res.StatusCode), http.StatusInternalServerError)
 }

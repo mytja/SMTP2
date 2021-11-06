@@ -16,7 +16,7 @@ import (
 )
 
 // TODO: Disable anyone with JWT to reply.
-func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
 	ok, from, err := crypto2.CheckUser(r)
@@ -35,7 +35,7 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	replytomsg, err := sql.DB.GetMessageFromReplyTo(replytoid)
+	replytomsg, err := server.db.GetMessageFromReplyTo(replytoid)
 	if err != nil {
 		helpers.Write(w, "Failed retrieving original message", http.StatusInternalServerError)
 		return
@@ -48,9 +48,9 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 		originalid = replytomsg.OriginalID
 	}
 
-	id := sql.DB.GetLastMessageID()
+	id := server.db.GetLastMessageID()
 	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
-	err = sql.DB.CommitMessage(basemsg)
+	err = server.db.CommitMessage(basemsg)
 	if err != nil {
 		helpers.Write(w, "Failed while committing message base", http.StatusInternalServerError)
 		return
@@ -59,14 +59,14 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	// Here we get either SentMessage or ReceivedMessage
 	var to string
 	if replytomsg.Type == "sent" {
-		message, err := sql.DB.GetSentMessage(replytoid)
+		message, err := server.db.GetSentMessage(replytoid)
 		if err != nil {
 			helpers.Write(w, "Failed to retrieve Sent message.", http.StatusInternalServerError)
 			return
 		}
 		to = message.ToEmail
 	} else {
-		message, err := sql.DB.GetReceivedMessage(replytoid)
+		message, err := server.db.GetReceivedMessage(replytoid)
 		if err != nil {
 			helpers.Write(w, "Failed to retrieve Received message.", http.StatusInternalServerError)
 			return
@@ -83,8 +83,8 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 
 	reply := sql.NewSentMessage(title, to, from, body, pass)
 	reply.ID = id
-	fmt.Println(reply)
-	err = sql.DB.CommitSentMessage(reply)
+	server.logger.Info(reply)
+	err = server.db.CommitSentMessage(reply)
 	if err != nil {
 		helpers.Write(w, "Failed to commit Sent message", http.StatusInternalServerError)
 		return
@@ -101,7 +101,7 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println(todomain)
+	server.logger.Info(todomain)
 
 	protocol := "http://"
 	if constants.ForceHttps {
@@ -142,15 +142,15 @@ func NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if res.StatusCode == http.StatusNotAcceptable {
 		helpers.Write(w, helpers.BytearrayToString(body2), http.StatusNotAcceptable)
-		sql.DB.DeleteMessage(basemsg.ID)
-		sql.DB.DeleteSentMessage(reply.ID)
+		server.db.DeleteMessage(basemsg.ID)
+		server.db.DeleteSentMessage(reply.ID)
 		return
 	}
-	fmt.Println(req.Header.Get("URI"))
-	fmt.Println(reqdom)
+	server.logger.Info(req.Header.Get("URI"))
+	server.logger.Info(reqdom)
 	if constants.EnableDeletingOnUnknownError {
-		sql.DB.DeleteMessage(basemsg.ID)
-		sql.DB.DeleteSentMessage(reply.ID)
+		server.db.DeleteMessage(basemsg.ID)
+		server.db.DeleteSentMessage(reply.ID)
 	}
 	helpers.Write(w, "Unknown error: "+fmt.Sprint(res.StatusCode)+" - "+helpers.BytearrayToString(body2), http.StatusInternalServerError)
 }

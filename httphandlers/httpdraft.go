@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-func NewDraft(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 	ok, from, err := crypto2.CheckUser(r)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -34,7 +34,7 @@ func NewDraft(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		originalmessage, err = sql.DB.GetOriginalMessageFromReplyTo(replytoid)
+		originalmessage, err = server.db.GetOriginalMessageFromReplyTo(replytoid)
 		if err != nil {
 			return
 		}
@@ -47,15 +47,15 @@ func NewDraft(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	id := sql.DB.GetLastMessageID()
+	id := server.db.GetLastMessageID()
 	msg := sql.NewDraftMessage(id, originalid, replypass, replyid)
 	sentmsg := sql.NewDraftSentMessage(id, "", "", from, "")
-	err = sql.DB.CommitMessage(msg)
+	err = server.db.CommitMessage(msg)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = sql.DB.CommitSentMessage(sentmsg)
+	err = server.db.CommitSentMessage(sentmsg)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,7 +63,7 @@ func NewDraft(w http.ResponseWriter, r *http.Request) {
 	helpers.Write(w, fmt.Sprint(id), http.StatusCreated)
 }
 
-func UpdateDraft(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) UpdateDraft(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
 	to := r.FormValue("To")
@@ -84,7 +84,7 @@ func UpdateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originaldraft, err := sql.DB.GetSentMessage(idint)
+	originaldraft, err := server.db.GetSentMessage(idint)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -95,7 +95,7 @@ func UpdateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	basemsg, err := sql.DB.GetOriginalMessageFromOriginalID(idint)
+	basemsg, err := server.db.GetOriginalMessageFromOriginalID(idint)
 	if err != nil {
 		helpers.Write(w, "Failed to retrieve base draft message from database", http.StatusInternalServerError)
 		return
@@ -110,7 +110,7 @@ func UpdateDraft(w http.ResponseWriter, r *http.Request) {
 
 	sentmsg := sql.NewDraftSentMessage(idint, title, to, from, body)
 
-	err = sql.DB.UpdateDraftSentMessage(sentmsg)
+	err = server.db.UpdateDraftSentMessage(sentmsg)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return

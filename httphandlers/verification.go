@@ -1,26 +1,24 @@
 package httphandlers
 
 import (
-	"fmt"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"strconv"
 )
 
-func MessageVerificationHandlers(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) MessageVerificationHandlers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id, err := strconv.Atoi(q.Get("id"))
 	if err != nil {
-		fmt.Println(err)
+		server.logger.Info(err)
 		helpers.Write(w, "FAIL", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(id, q.Get("pass"))
+	server.logger.Info(id, q.Get("pass"))
 	pass := q.Get("pass")
-	sentmsg, err := sql.DB.GetSentMessage(id)
+	sentmsg, err := server.db.GetSentMessage(id)
 	if err != nil {
-		fmt.Println(err)
+		server.logger.Info(err)
 		helpers.Write(w, "FAIL", http.StatusForbidden)
 		return
 	}

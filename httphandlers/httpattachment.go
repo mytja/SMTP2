@@ -14,7 +14,7 @@ import (
 	"strconv"
 )
 
-func UploadFile(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("file")
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
@@ -37,7 +37,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message, err := sql.DB.GetSentMessage(idint)
+	message, err := server.db.GetSentMessage(idint)
 	if err != nil {
 		helpers.Write(w, "Failed to retrieve message", http.StatusInternalServerError)
 		return
@@ -58,10 +58,10 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastattachmentid := sql.DB.GetLastAttachmentID()
+	lastattachmentid := server.db.GetLastAttachmentID()
 	fileext := helpers.GetFileExtension(handler.Filename)
 	filename := "attachments/" + id + "/" + fmt.Sprint(lastattachmentid) + fileext
-	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename, pass, "sent")
+	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename, pass)
 
 	defer file.Close()
 
@@ -94,7 +94,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	defer f.Close()
 
-	err = sql.DB.CommitAttachment(newattachment)
+	err = server.db.CommitAttachment(newattachment)
 	if err != nil {
 		helpers.Write(w, "Failed to commit attachment to database", http.StatusInternalServerError)
 		return
@@ -103,7 +103,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	helpers.Write(w, handler.Filename+" has been successfully uploaded", http.StatusCreated)
 }
 
-func DeleteAttachment(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
@@ -128,7 +128,7 @@ func DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sentmsg, err := sql.DB.GetSentMessage(midint)
+	sentmsg, err := server.db.GetSentMessage(midint)
 	if err != nil {
 		helpers.Write(w, "", http.StatusInternalServerError)
 		return
@@ -139,7 +139,7 @@ func DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attachment, err := sql.DB.GetAttachment(midint, aidint)
+	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -151,7 +151,7 @@ func DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = sql.DB.DeleteAttachment(midint, aidint)
+	err = server.db.DeleteAttachment(midint, aidint)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -160,7 +160,7 @@ func DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 	helpers.Write(w, "Successfully deleted following file.", http.StatusOK)
 }
 
-func GetAttachment(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
@@ -185,7 +185,7 @@ func GetAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sentmsg, err := sql.DB.GetSentMessage(midint)
+	sentmsg, err := server.db.GetSentMessage(midint)
 	if err != nil {
 		helpers.Write(w, "", http.StatusInternalServerError)
 		return
@@ -196,7 +196,7 @@ func GetAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attachment, err := sql.DB.GetAttachment(midint, aidint)
+	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -248,7 +248,7 @@ func GetAttachment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func RetrieveAttachment(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
@@ -265,13 +265,59 @@ func RetrieveAttachment(w http.ResponseWriter, r *http.Request) {
 
 	pass := r.URL.Query().Get("pass")
 
-	attachment, err := sql.DB.GetAttachment(midint, aidint)
+	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if attachment.AttachmentPass != pass {
-		helpers.Write(w, err.Error(), http.StatusForbidden)
+		helpers.Write(w, "Attachment password isn't matching to one saved in database", http.StatusForbidden)
 		return
 	}
+
+	Openfile, err := os.Open(attachment.Filename)
+	defer Openfile.Close()
+	if err != nil {
+		helpers.Write(w, "File not found.", http.StatusNotFound)
+		return
+	}
+
+	//File is found, create and send the correct headers
+
+	//Get the Content-Type of the file
+	//Create a buffer to store the header of the file in
+	FileHeader := make([]byte, 512)
+	//Copy the headers into the FileHeader buffer
+	_, err = Openfile.Read(FileHeader)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	//Get content type of file
+	FileContentType := http.DetectContentType(FileHeader)
+
+	//Get the file size
+	FileStat, _ := Openfile.Stat()                     //Get info from file
+	FileSize := strconv.FormatInt(FileStat.Size(), 10) //Get file size as a string
+
+	//Send the headers
+	headers := w.Header()
+	headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
+	headers.Set("Content-Type", FileContentType)
+	headers.Set("Content-Length", FileSize)
+	headers.Set("X-Filename", attachment.OriginalName)
+
+	//Send the file
+	//We read 512 bytes from the file already, so we reset the offset back to 0
+	_, err = Openfile.Seek(0, 0)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, err = io.Copy(w, Openfile)
+	if err != nil {
+		helpers.Write(w, fmt.Sprint("Failed writing file to writer.", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

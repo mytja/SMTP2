@@ -6,11 +6,11 @@ import (
 	"github.com/mytja/SMTP2/objects"
 )
 
-// TODO: Popravi vse pointerje k jih funkcije returnajo pa jih ne rabmo.
+// TODO: Popravi vse pointerje k jih funkcije returnajo pa jih ne rabmo. (kje?)
 
 func (db *sqlImpl) GetLastMessageID() int {
 	var id int
-	err := DB.GetDB().Get(&id, "SELECT id FROM messages WHERE id = (SELECT MAX(id) FROM messages)")
+	err := db.GetDB().Get(&id, "SELECT id FROM messages WHERE id = (SELECT MAX(id) FROM messages)")
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return 0

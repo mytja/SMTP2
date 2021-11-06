@@ -39,6 +39,7 @@ type SQL interface {
 	GetLastAttachmentID() int
 	GetAttachment(int, int) (*Attachment, error)
 	DeleteAttachment(int, int) error
+	GetAllAttachments(int) ([]Attachment, error)
 }
 
 func NewSQL() (SQL, error) {

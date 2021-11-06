@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.Header
 	title := q.Get("Title")
 	uri := q.Get("URI")
@@ -26,7 +26,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	fmt.Println(id, title, uri, to, from)
+	server.logger.Info(id, title, uri, to, from)
 	atoi, err := strconv.Atoi(id)
 	if err != nil {
 		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
@@ -40,7 +40,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	var isOriginal = false
 
-	originalmessage, err := sql.DB.GetOriginalFromReplyHeaders(replyid, replypass)
+	originalmessage, err := server.db.GetOriginalFromReplyHeaders(replyid, replypass)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			originalidint = -1
@@ -52,7 +52,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isOriginal {
 		if originalmessage.Type == "sent" {
-			originalmsg, err := sql.DB.GetSentMessage(originalmessage.ID)
+			originalmsg, err := server.db.GetSentMessage(originalmessage.ID)
 			if err != nil {
 				helpers.Write(w, "Unable to retrieve original message from SentMessages.", http.StatusInternalServerError)
 				return
@@ -62,9 +62,9 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
-			originalmsg, err := sql.DB.GetReceivedMessage(originalmessage.ID)
+			originalmsg, err := server.db.GetReceivedMessage(originalmessage.ID)
 			if err != nil {
-				fmt.Println(err)
+				server.logger.Info(err)
 				helpers.Write(w, "Unable to retrieve original message from ReceivedMessages.", http.StatusInternalServerError)
 				return
 			}
@@ -74,7 +74,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	_, err = sql.DB.GetUserByEmail(to)
+	_, err = server.db.GetUserByEmail(to)
 	if err != nil {
 		helpers.Write(w,
 			fmt.Sprint("Could not find recipient in our database or there was an internal error in recipient's database: ", err.Error()),
@@ -82,7 +82,7 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	msgid := sql.DB.GetLastMessageID()
+	msgid := server.db.GetLastMessageID()
 	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received", false)
 
 	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass, "")
@@ -107,19 +107,19 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 		msg.Warning = "SMTP2_FAILED_TO_PARSE_DOMAIN_AS_URI"
 	}
 	if requrl != nil && fromurl != nil {
-		fmt.Println(fromurl.Domain)
+		server.logger.Info(fromurl.Domain)
 		if requrl.Domain != fromurl.Domain {
 			msg.Warning = "SMTP2_DOMAINS_NOT_MATCHING"
 		}
 	}
 
 	// Commit
-	err = sql.DB.CommitMessage(basemsg)
+	err = server.db.CommitMessage(basemsg)
 	if err != nil {
 		helpers.Write(w, fmt.Sprint("Failed commiting base message to database", err.Error()), http.StatusInternalServerError)
 		return
 	}
-	err = sql.DB.CommitReceivedMessages(msg)
+	err = server.db.CommitReceivedMessages(msg)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
+	"github.com/mytja/SMTP2/helpers/constants"
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"strconv"
 )
 
-func GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
 	isAuth, email, err := crypto2.CheckUser(r)
 	if isAuth == false {
 		helpers.Write(w, "unauthenticated", http.StatusForbidden)
@@ -22,7 +23,7 @@ func GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	message, err := sql.DB.GetReceivedMessage(id)
+	message, err := server.db.GetReceivedMessage(id)
 	if err != nil {
 		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
 		return
@@ -44,19 +45,19 @@ func GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.Write(w, helpers.BytearrayToString(response), http.StatusOK)
 }
 
-func GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	pass := r.URL.Query().Get("pass")
 	if pass == "" {
 		helpers.Write(w, "Bad request - pass wasn't specified", http.StatusBadRequest)
 		return
 	}
-	message, err := sql.DB.GetSentMessage(id)
+	message, err := server.db.GetSentMessage(id)
 	if err != nil {
 		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
 		return
 	}
-	basemessage, err := sql.DB.GetOriginalMessageFromOriginalID(id)
+	basemessage, err := server.db.GetOriginalMessageFromOriginalID(id)
 	if err != nil {
 		helpers.Write(w, "Failed to retrieve base message from database: "+err.Error(), http.StatusNotFound)
 		return
@@ -69,19 +70,45 @@ func GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Could not confirm Message password", http.StatusForbidden)
 		return
 	}
-	var m = make(map[string]string)
+
+	fromdomain, err := helpers.GetDomainFromEmail(message.FromEmail)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	protocol := "http://"
+	if constants.ForceHttps {
+		protocol = "https://"
+	}
+
+	attachments, err := server.db.GetAllAttachments(id)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var attachmentsmap = make([]map[string]interface{}, 0)
+	for i := 0; i < len(attachments); i++ {
+		att := attachments[i]
+		var attachment = make(map[string]interface{})
+		attachment["ID"] = att.ID
+		attachment["Filename"] = att.ID
+		attachment["URL"] = protocol + fromdomain + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass
+		attachmentsmap = append(attachmentsmap, attachment)
+	}
+	var m = make(map[string]interface{})
 	m["ID"] = fmt.Sprint(message.ID)
 	m["Title"] = message.Title
 	m["Pass"] = message.Pass
 	m["Receiver"] = message.ToEmail
 	m["Sender"] = message.FromEmail
 	m["Body"] = message.Body
+	m["Attachments"] = attachmentsmap
 	w.Header().Set("Content-Type", "application/json")
 	response, _ := json.Marshal(m)
 	helpers.Write(w, helpers.BytearrayToString(response), http.StatusOK)
 }
 
-func GetInboxHandler(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) {
 	isAuth, username, err := crypto2.CheckUser(r)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -90,10 +117,10 @@ func GetInboxHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.Write(w, "Not authenticated", http.StatusForbidden)
 		return
 	}
-	fmt.Println(username)
-	inbox, err := sql.DB.GetInbox(username)
+	server.logger.Info(username)
+	inbox, err := server.db.GetInbox(username)
 	if err != nil {
-		fmt.Println(err)
+		server.logger.Info(err)
 		return
 	}
 	var m []map[string]string
