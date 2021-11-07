@@ -44,6 +44,8 @@ type HTTP interface {
 	// httpdraft.go
 	NewDraft(w http.ResponseWriter, r *http.Request)
 	UpdateDraft(w http.ResponseWriter, r *http.Request)
+
+	ServerInfo(w http.ResponseWriter, r *http.Request)
 }
 
 func NewHTTPInterface(logger *zap.SugaredLogger, db sql.SQL, config helpers.ServerConfig) HTTP {

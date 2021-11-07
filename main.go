@@ -71,6 +71,8 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/smtp2", httphandlers.WelcomeHandler).Methods(httphandlers.GET)
 
+	r.HandleFunc("/smtp2/server/info", httphandler.ServerInfo).Methods(httphandlers.GET)
+
 	// Message & replying
 	r.HandleFunc("/smtp2/message/receive", httphandler.ReceiveMessageHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/new", httphandler.NewMessageHandler).Methods(httphandlers.POST)

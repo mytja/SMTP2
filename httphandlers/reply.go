@@ -1,6 +1,7 @@
 package httphandlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
@@ -29,6 +30,17 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	fromemail, err := helpers.GetDomainFromEmail(from)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if fromemail != server.config.HostURL {
+		helpers.Write(w, "This server doesn't hold your domain.", http.StatusForbidden)
+		return
+	}
+	server.logger.Info(fmt.Sprint(fromemail, " ", server.config.HostURL))
+
 	replytoid, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusBadRequest)
@@ -38,21 +50,6 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	replytomsg, err := server.db.GetMessageFromReplyTo(replytoid)
 	if err != nil {
 		helpers.Write(w, "Failed retrieving original message", http.StatusInternalServerError)
-		return
-	}
-
-	var originalid int
-	if replytomsg.OriginalID == -1 {
-		originalid = replytomsg.ID
-	} else {
-		originalid = replytomsg.OriginalID
-	}
-
-	id := server.db.GetLastMessageID()
-	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
-	err = server.db.CommitMessage(basemsg)
-	if err != nil {
-		helpers.Write(w, "Failed while committing message base", http.StatusInternalServerError)
 		return
 	}
 
@@ -74,15 +71,61 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		to = message.FromEmail
 	}
 
+	todomain, err := helpers.GetDomainFromEmail(to)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if website has enabled HTTPS
+	resp, err := http.Get("http://" + todomain + "/smtp2/server/info")
+	if err != nil {
+		helpers.Write(w, "Remote server isn't avaiable at the moment. Failed to send message.", http.StatusInternalServerError)
+	}
+	reqbody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resjson := make(map[string]interface{})
+	err = json.Unmarshal(reqbody, &resjson)
+	if err != nil {
+		helpers.Write(w, "Failed to unmarshal remote server's response.", http.StatusInternalServerError)
+		return
+	}
+	protocol := "http://"
+	if resjson["hasHTTPS"] == true {
+		protocol = "https://"
+	}
+
+	var originalid int
+	if replytomsg.OriginalID == -1 {
+		originalid = replytomsg.ID
+	} else {
+		originalid = replytomsg.OriginalID
+	}
+
+	id := server.db.GetLastMessageID()
+	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
+	err = server.db.CommitMessage(basemsg)
+	if err != nil {
+		helpers.Write(w, "Failed while committing message base", http.StatusInternalServerError)
+		return
+	}
+
 	// Generate random password
-	pass, err := security.GenerateRandomString(50)
+	pass, err := security.GenerateRandomString(80)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	mvppass, err := security.GenerateRandomString(80)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	reply := sql.NewSentMessage(title, to, from, body, pass)
-	reply.ID = id
+	reply := sql.NewSentMessage(id, title, to, from, body, pass, mvppass)
 	server.logger.Info(reply)
 	err = server.db.CommitSentMessage(reply)
 	if err != nil {
@@ -91,17 +134,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Now let's send a request to a recipient email server
-	todomain, err := helpers.GetDomainFromEmail(to)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	server.logger.Info(todomain)
-
-	protocol := "http://"
-	if constants.ForceHttps {
-		protocol = "https://"
-	}
 
 	urlprotocol := "http://"
 	if server.config.HTTPSEnabled {
@@ -118,6 +151,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	req.Header.Set("ReplyID", replytomsg.ReplyID)
 	req.Header.Set("ServerID", fmt.Sprint(id))
 	req.Header.Set("OriginalID", fmt.Sprint(originalid))
+	req.Header.Set("MVPPass", fmt.Sprint(mvppass))
 	req.Header.Set(
 		"URI",
 		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,

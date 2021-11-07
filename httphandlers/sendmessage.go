@@ -1,6 +1,7 @@
 package httphandlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
@@ -29,6 +30,17 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		helpers.Write(w, "Forbidden", http.StatusForbidden)
 		return
 	}
+
+	fromemail, err := helpers.GetDomainFromEmail(from)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if fromemail != server.config.HostURL {
+		helpers.Write(w, "This server doesn't hold your domain.", http.StatusForbidden)
+		return
+	}
+	server.logger.Info(fmt.Sprint(fromemail, " ", server.config.HostURL))
 
 	var iscreatedfromdraft = false
 	var originalid = -1
@@ -74,21 +86,53 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	pass, err := security.GenerateRandomString(50)
+	pass, err := security.GenerateRandomString(80)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	replyPass, err := security.GenerateRandomString(50)
+	replyPass, err := security.GenerateRandomString(80)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	replyID, err := security.GenerateRandomString(50)
+	replyID, err := security.GenerateRandomString(80)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	mvppass, err := security.GenerateRandomString(80)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	todomain, err := helpers.GetDomainFromEmail(to)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resp, err := http.Get("http://" + todomain + "/smtp2/server/info")
+	if err != nil {
+		helpers.Write(w, "Remote server isn't available at the moment. Failed to send message.", http.StatusInternalServerError)
+	}
+	reqbody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resjson := make(map[string]interface{})
+	err = json.Unmarshal(reqbody, &resjson)
+	if err != nil {
+		helpers.Write(w, "Failed to unmarshal remote server's response.", http.StatusInternalServerError)
+		return
+	}
+	protocol := "http://"
+	if resjson["hasHTTPS"] == true {
+		protocol = "https://"
+	}
+
 	basemsg := objects.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
 	if iscreatedfromdraft {
 		// Update instead of pushing
@@ -106,27 +150,17 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	}
 	server.logger.Info(basemsg)
 
-	msg := sql.NewSentMessage(title, to, from, body, pass)
-	msg.ID = id
+	msg := sql.NewSentMessage(id, title, to, from, body, pass, mvppass)
 	server.logger.Info(msg.ID)
 
 	server.logger.Info(msg)
 
 	// Now let's send a request to a recipient email server
-	todomain, err := helpers.GetDomainFromEmail(msg.ToEmail)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	server.logger.Info(todomain)
 
 	idstring := fmt.Sprint(id)
 	server.logger.Info("ID2: ", idstring)
 
-	protocol := "http://"
-	if constants.ForceHttps {
-		protocol = "https://"
-	}
 	reqdom := protocol + todomain + "/smtp2/message/receive"
 
 	urlprotocol := "http://"
@@ -143,6 +177,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	req.Header.Set("ReplyID", basemsg.ReplyID)
 	req.Header.Set("OriginalID", "-1")
 	req.Header.Set("ServerID", fmt.Sprint(idstring))
+	req.Header.Set("MVPPass", fmt.Sprint(mvppass))
 	req.Header.Set(
 		"URI",
 		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,

@@ -22,7 +22,7 @@ func (server *httpImpl) MessageVerificationHandlers(w http.ResponseWriter, r *ht
 		helpers.Write(w, "FAIL", http.StatusForbidden)
 		return
 	}
-	if sentmsg.Pass != pass {
+	if sentmsg.MVPPass != pass {
 		helpers.Write(w, "Failed to verify Message password", http.StatusForbidden)
 		return
 	}

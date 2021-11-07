@@ -17,7 +17,7 @@ func VerifyEmailServer(mail sql.ReceivedMessage) error {
 	}
 	fmt.Println(domain)
 	id := fmt.Sprint(mail.ServerID)
-	reqdom := domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.ServerPass
+	reqdom := domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.MVPPass
 	fmt.Println(reqdom)
 	res, err := http.Get(reqdom)
 	if err != nil {
@@ -48,7 +48,7 @@ func VerifyEmailSender(mail sql.ReceivedMessage) error {
 	if constants.ForceHttpsForMailDomain {
 		protocol = "https://"
 	}
-	reqdom := protocol + domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.ServerPass
+	reqdom := protocol + domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.MVPPass
 	fmt.Println(reqdom)
 	res, err := http.Get(reqdom)
 	if err != nil {

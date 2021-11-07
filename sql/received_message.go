@@ -13,6 +13,7 @@ type ReceivedMessage struct {
 	ServerID   int    `db:"server_id"`   // This is used to get specific message from server
 	ServerPass string `db:"server_pass"` // This is password used to access this email from server
 	Warning    string
+	MVPPass    string `db:"mvp_pass"`
 }
 
 func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
@@ -26,7 +27,7 @@ func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
 
 func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning)",
+		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning, mvp_pass) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning, :mvp_pass)",
 		msg)
 	if err != nil {
 		return err
@@ -41,14 +42,16 @@ func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 }
 
 func NewReceivedMessage(
-	title string, URI string, to string, from string, id int, pass string, warning string) ReceivedMessage {
+	id int, title string, URI string, to string, from string, sid int, pass string, warning string, mvppass string) ReceivedMessage {
 	return ReceivedMessage{
+		ID:         id,
 		Title:      title,
 		URI:        URI,
 		ToEmail:    to,
 		FromEmail:  from,
-		ServerID:   id,
+		ServerID:   sid,
 		ServerPass: pass,
 		Warning:    warning,
+		MVPPass:    mvppass,
 	}
 }

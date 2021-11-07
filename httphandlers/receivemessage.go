@@ -22,11 +22,12 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	replyid := q.Get("ReplyPass")
 	replypass := q.Get("ReplyID")
 	originalid := q.Get("OriginalID")
-	if replyid == "" || replypass == "" {
+	mvppass := q.Get("MVPPass")
+	if replyid == "" || replypass == "" || mvppass == "" {
 		helpers.Write(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	server.logger.Info(id, title, uri, to, from)
+	server.logger.Info(fmt.Sprint(id, title, uri, to, from, mvppass))
 	atoi, err := strconv.Atoi(id)
 	if err != nil {
 		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
@@ -85,8 +86,7 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	msgid := server.db.GetLastMessageID()
 	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received", false)
 
-	msg := sql.NewReceivedMessage(title, uri, to, from, atoi, pass, "")
-	msg.ID = msgid
+	msg := sql.NewReceivedMessage(msgid, title, uri, to, from, atoi, pass, "", mvppass)
 
 	verification, _ := security.VerifyMessage(msg)
 	if !verification {

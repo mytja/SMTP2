@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS receivedmsgs (
 	from_email   VARCHAR(250)  NOT NULL,
 	title        VARCHAR(250)  NOT NULL,
 	server_id    INTEGER       NOT NULL,
-	server_pass  VARCHAR(30)   NOT NULL,
+	server_pass  VARCHAR(100)  NOT NULL,
+	mvp_pass     VARCHAR(100)  NOT NULL,
 	warning      VARCHAR(75)
 );
 CREATE TABLE IF NOT EXISTS messages (
@@ -33,7 +34,8 @@ CREATE TABLE IF NOT EXISTS sentmsgs (
 	from_email   VARCHAR(250)  NOT NULL,
 	title        VARCHAR(250)  NOT NULL,
 	body         TEXT          NOT NULL,
-	pass         VARCHAR(30)   NOT NULL
+	pass         VARCHAR(100)  NOT NULL,
+	mvp_pass     VARCHAR(100)  NOT NULL
 );
 CREATE TABLE IF NOT EXISTS users (
     id           INTEGER       PRIMARY KEY,
