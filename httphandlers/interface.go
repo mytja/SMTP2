@@ -24,6 +24,7 @@ type HTTP interface {
 	GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request)
 	GetSentMessageHandler(w http.ResponseWriter, r *http.Request)
 	GetInboxHandler(w http.ResponseWriter, r *http.Request)
+	UpdateMessage(w http.ResponseWriter, r *http.Request)
 
 	// sendmessage.go
 	NewMessageHandler(w http.ResponseWriter, r *http.Request)
@@ -43,7 +44,6 @@ type HTTP interface {
 
 	// httpdraft.go
 	NewDraft(w http.ResponseWriter, r *http.Request)
-	UpdateDraft(w http.ResponseWriter, r *http.Request)
 
 	ServerInfo(w http.ResponseWriter, r *http.Request)
 }

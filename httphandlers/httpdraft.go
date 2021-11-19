@@ -63,7 +63,7 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 	helpers.Write(w, fmt.Sprint(id), http.StatusCreated)
 }
 
-func (server *httpImpl) UpdateDraft(w http.ResponseWriter, r *http.Request) {
+func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
 	to := r.FormValue("To")
@@ -101,11 +101,8 @@ func (server *httpImpl) UpdateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !basemsg.IsDraft {
-		helpers.Write(w,
-			"This message isn't a draft anymore...\nYour changes were denied, but you can use a different endpoint",
-			http.StatusNotAcceptable,
-		)
-		return
+		server.logger.Info("Ignored To, as you can't change it, because Message is already sent.")
+		to = originaldraft.ToEmail
 	}
 
 	sentmsg := sql.NewDraftSentMessage(idint, title, to, from, body)

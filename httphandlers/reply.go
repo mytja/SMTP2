@@ -157,8 +157,6 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
 	)
 
-	//time.Sleep(1 * time.Second)
-
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusForbidden)

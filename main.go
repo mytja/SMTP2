@@ -77,6 +77,7 @@ func main() {
 	r.HandleFunc("/smtp2/message/receive", httphandler.ReceiveMessageHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/new", httphandler.NewMessageHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/update", httphandler.UpdateMessage).Methods(httphandlers.PATCH)
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	// Get message from receiver server (ReceivedMessage)
 	r.HandleFunc("/smtp2/message/inbox/get/{id}", httphandler.GetReceivedMessageHandler).Methods(httphandlers.GET)
@@ -85,7 +86,6 @@ func main() {
 
 	// Drafts
 	r.HandleFunc("/smtp2/draft/new", httphandler.NewDraft).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/draft/save", httphandler.UpdateDraft).Methods(httphandlers.POST)
 
 	// Attachment handling
 	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandler.UploadFile).Methods(httphandlers.POST)
