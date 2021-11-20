@@ -42,29 +42,46 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	}
 	server.logger.Infow("config", "from", fromemail, "hosturl", server.config.HostURL)
 
-	if !strings.Contains(to, "@") {
-		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
-		return
+	var iscreatedfromdraft = false
+	var originalid = -1
+	var serverid = -1
+	var draftid int
+
+	if usedraft != "" {
+		draftid, err = strconv.Atoi(usedraft)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		message, err := server.db.GetSentMessage(draftid)
+		if err != nil {
+			helpers.Write(w, "Failed to retrieve draft from database", http.StatusInternalServerError)
+			return
+		}
+		if message.FromEmail != from {
+			helpers.Write(w, "You didn't create this draft...", http.StatusForbidden)
+			return
+		}
+		basemsg, err := server.db.GetMessageFromReplyTo(draftid)
+		if err != nil {
+			helpers.Write(w, "Failed to retrieve draft base from database", http.StatusInternalServerError)
+			return
+		}
+		if !basemsg.IsDraft {
+			helpers.Write(w, "This isn't a draft anymore...", http.StatusBadRequest)
+			return
+		}
+		iscreatedfromdraft = true
+		serverid = basemsg.ServerID
+		originalid = basemsg.OriginalID
+
+		title = message.Title
+		body = message.Body
+		to = message.ToEmail
 	}
 
-	pass, err := security.GenerateRandomString(80)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	replyPass, err := security.GenerateRandomString(80)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	replyID, err := security.GenerateRandomString(80)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	mvppass, err := security.GenerateRandomString(80)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+	if !strings.Contains(to, "@") {
+		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
 		return
 	}
 
@@ -74,44 +91,29 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	for i := 0; i < len(tolist); i++ {
 		to = tolist[i]
 
-		var iscreatedfromdraft = false
-		var originalid = -1
-		var serverid = -1
-		id := server.db.GetLastMessageID()
-
-		if usedraft != "" {
-			draftid, err := strconv.Atoi(usedraft)
-			if err != nil {
-				helpers.Write(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			message, err := server.db.GetSentMessage(draftid)
-			if err != nil {
-				helpers.Write(w, "Failed to retrieve draft from database", http.StatusInternalServerError)
-				return
-			}
-			if message.FromEmail != from {
-				helpers.Write(w, "You didn't create this draft...", http.StatusForbidden)
-				return
-			}
-			basemsg, err := server.db.GetMessageFromReplyTo(draftid)
-			if err != nil {
-				helpers.Write(w, "Failed to retrieve draft base from database", http.StatusInternalServerError)
-				return
-			}
-			if !basemsg.IsDraft {
-				helpers.Write(w, "This isn't a draft anymore...", http.StatusBadRequest)
-				return
-			}
-			iscreatedfromdraft = true
-			serverid = basemsg.ServerID
-			originalid = basemsg.OriginalID
-
-			title = message.Title
-			body = message.Body
-			to = message.ToEmail
-			id = message.ID
+		// Generate different passwords for different recipients
+		pass, err := security.GenerateRandomString(80)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
+		replyPass, err := security.GenerateRandomString(80)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		replyID, err := security.GenerateRandomString(80)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		mvppass, err := security.GenerateRandomString(80)
+		if err != nil {
+			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		id := server.db.GetLastMessageID()
 
 		var result = make(map[string]interface{})
 
@@ -152,25 +154,13 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		}
 
 		basemsg := objects.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
-		if iscreatedfromdraft {
-			// Update instead of pushing
-			err := server.db.UpdateDraftMessage(basemsg)
-			if err != nil {
-				result["Body"] = "Error while committing base Message to database."
-				result["To"] = to
-				result["StatusCode"] = -1
-				responseMap = append(responseMap, result)
-				break
-			}
-		} else {
-			err = server.db.CommitMessage(basemsg)
-			if err != nil {
-				result["Body"] = "Error while committing base Message to database."
-				result["To"] = to
-				result["StatusCode"] = -1
-				responseMap = append(responseMap, result)
-				break
-			}
+		err = server.db.CommitMessage(basemsg)
+		if err != nil {
+			result["Body"] = "Error while committing base Message to database."
+			result["To"] = to
+			result["StatusCode"] = -1
+			responseMap = append(responseMap, result)
+			break
 		}
 
 		msg := sql.NewSentMessage(id, title, to, from, body, pass, mvppass)
@@ -203,24 +193,13 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		)
 
 		// We have to commit a message before we send a request
-		if iscreatedfromdraft {
-			err = server.db.UpdateDraftSentMessage(msg)
-			if err != nil {
-				result["Body"] = "Error while committing Sent message to database."
-				result["To"] = to
-				result["StatusCode"] = -1
-				responseMap = append(responseMap, result)
-				break
-			}
-		} else {
-			err = server.db.CommitSentMessage(msg)
-			if err != nil {
-				result["Body"] = "Error while committing Sent message to database."
-				result["To"] = to
-				result["StatusCode"] = -1
-				responseMap = append(responseMap, result)
-				break
-			}
+		err = server.db.CommitSentMessage(msg)
+		if err != nil {
+			result["Body"] = "Error while committing Sent message to database."
+			result["To"] = to
+			result["StatusCode"] = -1
+			responseMap = append(responseMap, result)
+			break
 		}
 
 		res, err := http.DefaultClient.Do(req)
@@ -246,6 +225,12 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			server.db.DeleteMessage(basemsg.ID)
 			server.db.DeleteSentMessage(msg.ID)
 		}
+	}
+	if iscreatedfromdraft == true {
+		// Delete draft message, as it isn't used anymore
+		server.logger.Infow("deleting draft message", "id", draftid)
+		server.db.DeleteMessage(draftid)
+		server.db.DeleteSentMessage(draftid)
 	}
 	marshal, _ := json.Marshal(responseMap)
 	helpers.Write(w, helpers.BytearrayToString(marshal), http.StatusCreated)
