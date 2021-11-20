@@ -7,6 +7,7 @@ import (
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"net/http"
@@ -95,16 +96,18 @@ func main() {
 	r.HandleFunc("/smtp2/attachment/retrieve/{mid}/{aid}", httphandler.RetrieveAttachment).Methods(httphandlers.GET)
 
 	// User functions
-	r.HandleFunc("/user/new", httphandler.NewUser).Methods(httphandlers.POST)
-	r.HandleFunc("/user/login", httphandler.Login).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/user/new", httphandler.NewUser).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/user/login", httphandler.Login).Methods(httphandlers.POST)
 
 	// SMTP2 Sender Server Verification Protocol
 	r.HandleFunc("/smtp2/message/verify", httphandler.MessageVerificationHandlers).Methods(httphandlers.GET)
 
+	handler := cors.Default().Handler(r)
+
 	sugared.Info("Serving...")
 	serve := config.Host + ":" + config.Port
 	sugared.Info("Serving on following URL: " + serve)
-	err = http.ListenAndServe(serve, r)
+	err = http.ListenAndServe(serve, handler)
 	if err != nil {
 		sugared.Fatal(err.Error())
 	}
