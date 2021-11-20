@@ -79,6 +79,7 @@ func main() {
 	r.HandleFunc("/smtp2/message/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/message/update", httphandler.UpdateMessage).Methods(httphandlers.PATCH)
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
+	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)
 	// Get message from receiver server (ReceivedMessage)
 	r.HandleFunc("/smtp2/message/inbox/get/{id}", httphandler.GetReceivedMessageHandler).Methods(httphandlers.GET)
 	// Get message from sender server (SentMessage)

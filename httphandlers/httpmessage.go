@@ -138,3 +138,89 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 }
+
+func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
+	title := r.FormValue("Title")
+	body := r.FormValue("Body")
+	to := r.FormValue("To")
+	id := r.FormValue("ID")
+	idint, err := strconv.Atoi(id)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, from, err := crypto2.CheckUser(r)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		helpers.Write(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	originaldraft, err := server.db.GetSentMessage(idint)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if originaldraft.FromEmail != from {
+		helpers.Write(w, "You don't have access to this resource.", http.StatusForbidden)
+		return
+	}
+
+	basemsg, err := server.db.GetOriginalMessageFromOriginalID(idint)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve base draft message from database", http.StatusInternalServerError)
+		return
+	}
+	if !basemsg.IsDraft {
+		server.logger.Info("Ignored To, as you can't change it, because Message is already sent.")
+		to = originaldraft.ToEmail
+	}
+
+	sentmsg := sql.NewDraftSentMessage(idint, title, to, from, body)
+
+	err = server.db.UpdateDraftSentMessage(sentmsg)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	helpers.Write(w, "OK - Updated successfully!", http.StatusOK)
+}
+
+func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		helpers.Write(w, "Not a valid integer", http.StatusBadRequest)
+		return
+	}
+
+	ok, from, err := crypto2.CheckUser(r)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		helpers.Write(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	message, err := server.db.GetSentMessage(id)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve Sent message from database", http.StatusNotFound)
+		return
+	}
+
+	if message.FromEmail != from {
+		helpers.Write(w, "You don't have permission to delete this message", http.StatusForbidden)
+		return
+	}
+
+	server.db.DeleteSentMessage(id)
+	server.db.DeleteMessage(id)
+
+	helpers.Write(w, "OK", http.StatusOK)
+}
