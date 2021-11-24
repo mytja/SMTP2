@@ -6,4 +6,6 @@ type ServerConfig struct {
 	Port         string
 	HostURL      string
 	HTTPSEnabled bool
+	DBDriver     string
+	DBConfig     string
 }

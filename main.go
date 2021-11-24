@@ -28,9 +28,10 @@ func main() {
 	command.Flags().StringVar(&config.Host, "host", "0.0.0.0", "set server host")
 	command.Flags().StringVar(&config.Port, "port", "8080", "set server port")
 	command.Flags().StringVar(&constants.ServerUrl, "url", "http://0.0.0.0:8080", "set server URL")
-	command.Flags().StringVar(&constants.DbName, "dbname", "smtp2.db", "set DB name")
+	command.Flags().StringVar(&config.DBConfig, "dbconfig", "smtp2.db", "set DB name")
 	command.Flags().StringVar(&config.HostURL, "hosturl", "", "What should be shown after @ symbol")
 	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
+	command.Flags().StringVar(&config.DBDriver, "dbname", "sqlite3", "DB Driver name")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -57,7 +58,7 @@ func main() {
 
 	sugared := logger.Sugar()
 
-	db, err := sql.NewSQL()
+	db, err := sql.NewSQL(config.DBDriver, config.DBConfig)
 	db.Init()
 
 	if err != nil {

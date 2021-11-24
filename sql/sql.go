@@ -2,8 +2,8 @@ package sql
 
 import (
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/objects"
 )
 
@@ -42,8 +42,8 @@ type SQL interface {
 	GetAllAttachments(int) ([]Attachment, error)
 }
 
-func NewSQL() (SQL, error) {
-	db, err := sqlx.Connect("sqlite3", constants.DbName)
+func NewSQL(driver string, drivername string) (SQL, error) {
+	db, err := sqlx.Connect(driver, drivername)
 	tx := db.MustBegin()
 	return &sqlImpl{
 		db:  db,
