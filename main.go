@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
-	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"net/http"
@@ -102,12 +102,15 @@ func main() {
 	// SMTP2 Sender Server Verification Protocol
 	r.HandleFunc("/smtp2/message/verify", httphandler.MessageVerificationHandlers).Methods(httphandlers.GET)
 
-	handler := cors.Default().Handler(r)
-
 	sugared.Info("Serving...")
 	serve := config.Host + ":" + config.Port
 	sugared.Info("Serving on following URL: " + serve)
-	err = http.ListenAndServe(serve, handler)
+
+	header := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "X-Login-Token"})
+	methods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "HEAD", "OPTIONS", "DELETE"})
+	origins := handlers.AllowedOrigins([]string{"*"})
+
+	err = http.ListenAndServe(serve, handlers.CORS(header, methods, origins)(r))
 	if err != nil {
 		sugared.Fatal(err.Error())
 	}

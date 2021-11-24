@@ -125,6 +125,7 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 		m1["To"] = msg.ToEmail
 		m1["From"] = msg.FromEmail
 		m1["Title"] = msg.Title
+		m1["ID"] = fmt.Sprint(msg.ID)
 
 		m = append(m, m1)
 	}
