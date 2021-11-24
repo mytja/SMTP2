@@ -24,6 +24,8 @@ func main() {
 		Short: "Mail server using SMTP2 protocol",
 	}
 
+	var useenv bool
+
 	command.Flags().BoolVar(&config.Debug, "debug", false, "enable debug mode")
 	command.Flags().StringVar(&config.Host, "host", "0.0.0.0", "set server host")
 	command.Flags().StringVar(&config.Port, "port", "8080", "set server port")
@@ -32,10 +34,46 @@ func main() {
 	command.Flags().StringVar(&config.HostURL, "hosturl", "", "What should be shown after @ symbol")
 	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
 	command.Flags().StringVar(&config.DBDriver, "dbname", "sqlite3", "DB Driver name")
+	command.Flags().BoolVar(&useenv, "useenv", false, "Use environment variables and ignore this selection")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return
+	}
+	if useenv == true {
+		debug := os.Getenv("Debug")
+		if debug == "" {
+			config.Debug = false
+		} else {
+			config.Debug = true
+		}
+		httpsenabled := os.Getenv("HTTPSEnabled")
+		if httpsenabled == "" {
+			config.HTTPSEnabled = false
+		} else {
+			config.HTTPSEnabled = true
+		}
+		config.Host = os.Getenv("Host")
+		if config.Host == "" {
+			config.Host = "0.0.0.0"
+		}
+		config.Port = os.Getenv("Port")
+		if config.Port == "" {
+			config.Port = "8080"
+		}
+		constants.ServerUrl = os.Getenv("ServerURL")
+		if constants.ServerUrl == "" {
+			constants.ServerUrl = "http://0.0.0.0:8080"
+		}
+		config.DBConfig = os.Getenv("DBConfig")
+		if config.DBConfig == "" {
+			config.DBConfig = "smtp2.db"
+		}
+		config.DBDriver = os.Getenv("DBName")
+		if config.DBDriver == "" {
+			config.DBDriver = "sqlite3"
+		}
+		config.HostURL = os.Getenv("HostURL")
 	}
 	if config.HostURL == "" {
 		// This means it's running in localhost
@@ -57,6 +95,7 @@ func main() {
 	}
 
 	sugared := logger.Sugar()
+	sugared.Infow("using following database", "driver", config.DBDriver, "config", config.DBConfig)
 
 	db, err := sql.NewSQL(config.DBDriver, config.DBConfig)
 	db.Init()

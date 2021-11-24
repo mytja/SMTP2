@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=builder /app/SMTP2 ./SMTP2-server
 
 EXPOSE 8080
-CMD [ "./SMTP2-server" ]
+CMD [ "./SMTP2-server --useenv" ]
