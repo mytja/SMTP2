@@ -31,7 +31,7 @@ func (server *httpImpl) GetReceivedMessageHandler(w http.ResponseWriter, r *http
 		helpers.Write(w, "unauthenticated", http.StatusForbidden)
 		return
 	}
-	var m map[string]string
+	var m = make(map[string]string)
 	m["ID"] = fmt.Sprint(message.ID)
 	m["ServerID"] = fmt.Sprint(message.ServerID)
 	m["Title"] = message.Title
