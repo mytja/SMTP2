@@ -7,6 +7,7 @@ import (
 	"github.com/mytja/SMTP2/helpers"
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -31,11 +32,15 @@ func (server *httpImpl) GetReceivedMessageHandler(w http.ResponseWriter, r *http
 		helpers.Write(w, "unauthenticated", http.StatusForbidden)
 		return
 	}
+	protocol := "http://"
+	if server.config.HTTPSEnabled {
+		protocol = "https://"
+	}
 	var m = make(map[string]string)
 	m["ID"] = fmt.Sprint(message.ID)
 	m["ServerID"] = fmt.Sprint(message.ServerID)
 	m["Title"] = message.Title
-	m["URI"] = message.URI
+	m["URI"] = protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(message.ID)
 	m["ServerPass"] = message.ServerPass
 	m["Receiver"] = message.ToEmail
 	m["Sender"] = message.FromEmail
@@ -92,7 +97,6 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 	var m = make(map[string]interface{})
 	m["ID"] = fmt.Sprint(message.ID)
 	m["Title"] = message.Title
-	m["Pass"] = message.Pass
 	m["Receiver"] = message.ToEmail
 	m["Sender"] = message.FromEmail
 	m["Body"] = message.Body
@@ -224,4 +228,46 @@ func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	server.db.DeleteMessage(id)
 
 	helpers.Write(w, "OK", http.StatusOK)
+}
+
+func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r *http.Request) {
+	isAuth, username, err := crypto2.CheckUser(r)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else if isAuth == false {
+		helpers.Write(w, "Not authenticated", http.StatusForbidden)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		helpers.Write(w, "Not a valid integer", http.StatusBadRequest)
+		return
+	}
+	msg, err := server.db.GetReceivedMessage(id)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve message from database", http.StatusInternalServerError)
+		return
+	}
+	if msg.ToEmail != username {
+		helpers.Write(w, "This message wasn't intended for you!", http.StatusForbidden)
+		return
+	}
+	resp, err := http.Get(msg.URI)
+	if err != nil {
+		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		return
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+		return
+	}
+	bodystring := helpers.BytearrayToString(body)
+	if resp.StatusCode != http.StatusOK {
+		helpers.Write(w, bodystring, resp.StatusCode)
+		return
+	}
+	helpers.Write(w, bodystring, http.StatusOK)
+
 }

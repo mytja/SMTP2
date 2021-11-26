@@ -123,8 +123,9 @@ func main() {
 	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)
 	// Get message from receiver server (ReceivedMessage)
 	r.HandleFunc("/smtp2/message/inbox/get/{id}", httphandler.GetReceivedMessageHandler).Methods(httphandlers.GET)
-	// Get message from sender server (SentMessage)
+	// Get message from sender server (SentMessage) - recipient server -> sender server
 	r.HandleFunc("/smtp2/message/get/{id}", httphandler.GetSentMessageHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/retrieve/{id}", httphandler.RetrieveMessageFromRemoteServer).Methods(httphandlers.GET)
 
 	// Drafts
 	r.HandleFunc("/smtp2/draft/new", httphandler.NewDraft).Methods(httphandlers.POST)
