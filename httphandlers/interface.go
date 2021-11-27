@@ -19,6 +19,7 @@ type HTTP interface {
 	DeleteAttachment(w http.ResponseWriter, r *http.Request)
 	GetAttachment(w http.ResponseWriter, r *http.Request)
 	RetrieveAttachment(w http.ResponseWriter, r *http.Request)
+	RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request)
 
 	// httpmessage.go
 	GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request)

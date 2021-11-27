@@ -89,8 +89,8 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 	for i := 0; i < len(attachments); i++ {
 		att := attachments[i]
 		var attachment = make(map[string]interface{})
-		attachment["ID"] = att.ID
-		attachment["Filename"] = att.ID
+		attachment["ID"] = fmt.Sprint(att.ID)
+		attachment["Filename"] = att.OriginalName
 		attachment["URL"] = protocol + server.config.HostURL + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass
 		attachmentsmap = append(attachmentsmap, attachment)
 	}
@@ -268,6 +268,33 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		helpers.Write(w, bodystring, resp.StatusCode)
 		return
 	}
-	helpers.Write(w, bodystring, http.StatusOK)
 
+	// Let's manipulate string to hide URLs to attachments
+	// TLDR: Some advanced manipulation
+	var j MessagePayload
+	err = json.Unmarshal(body, &j)
+	if err != nil {
+		fmt.Println(err)
+		helpers.Write(w, "Failed to unmarshal request data", http.StatusInternalServerError)
+		return
+	}
+	var attachments = make([]map[string]string, 0)
+	var att = j.Attachments
+	for i := 0; i < len(att); i++ {
+		attachment := att[i]
+		protocol := "http://"
+		if server.config.HTTPSEnabled {
+			protocol = "https://"
+		}
+		url := protocol + server.config.HostURL + "/smtp2/attachment/remote/get/" + fmt.Sprint(id) + "/" + attachment["ID"]
+		attachment["URL"] = url
+		attachments = append(attachments, attachment)
+	}
+	j.Attachments = attachments
+	marshal, err := json.Marshal(j)
+	if err != nil {
+		helpers.Write(w, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+	helpers.Write(w, helpers.BytearrayToString(marshal), http.StatusOK)
 }

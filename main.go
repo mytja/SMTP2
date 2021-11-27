@@ -135,6 +135,7 @@ func main() {
 	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.DeleteAttachment).Methods(httphandlers.DELETE)
 	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.GetAttachment).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/attachment/retrieve/{mid}/{aid}", httphandler.RetrieveAttachment).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/attachment/remote/get/{mid}/{aid}", httphandler.RetrieveAttachmentFromRemoteServer).Methods(httphandlers.GET)
 
 	// User functions
 	r.HandleFunc("/smtp2/user/new", httphandler.NewUser).Methods(httphandlers.POST)

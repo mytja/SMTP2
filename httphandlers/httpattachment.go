@@ -1,6 +1,7 @@
 package httphandlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -9,10 +10,20 @@ import (
 	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 )
+
+type MessagePayload struct {
+	ID          string              `json:"ID"`
+	Title       string              `json:"Title"`
+	Receiver    string              `json:"Receiver"`
+	Sender      string              `json:"Sender"`
+	Body        string              `json:"Body"`
+	Attachments []map[string]string `json:"Attachments"`
+}
 
 func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("file")
@@ -320,4 +331,99 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request) {
+	ok, from, err := crypto2.CheckUser(r)
+	if err != nil {
+		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		helpers.Write(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := mux.Vars(r)["mid"]
+	midint, err := strconv.Atoi(mid)
+	if err != nil {
+		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		return
+	}
+
+	aid := mux.Vars(r)["aid"]
+	_, err = strconv.Atoi(aid)
+	if err != nil {
+		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		return
+	}
+
+	message, err := server.db.GetReceivedMessage(midint)
+	if err != nil {
+		helpers.Write(w, "Failed to retrieve SentMessage from database", http.StatusInternalServerError)
+		return
+	}
+
+	if message.ToEmail != from {
+		helpers.Write(w, "This message doesn't belong to you", http.StatusForbidden)
+		return
+	}
+
+	resp, err := http.Get(message.URI)
+	if err != nil {
+		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		return
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+		return
+	}
+	bodystring := helpers.BytearrayToString(body)
+	if resp.StatusCode != http.StatusOK {
+		helpers.Write(w, bodystring, resp.StatusCode)
+		return
+	}
+	var j MessagePayload
+	err = json.Unmarshal(body, &j)
+	if err != nil {
+		helpers.Write(w, "Failed to unmarshal response body", http.StatusInternalServerError)
+		return
+	}
+	var attachments = j.Attachments
+	var url = ""
+	for i := 0; i < len(attachments); i++ {
+		attachment := attachments[i]
+		if attachment["ID"] == aid {
+			url = attachment["URL"]
+		}
+	}
+	if url == "" {
+		helpers.Write(w, "Could not find attachment with following ID", http.StatusNotFound)
+		return
+	}
+	att, err := http.Get(url)
+	if err != nil {
+		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		return
+	}
+	if att.StatusCode != 200 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+			return
+		}
+		bodystring := helpers.BytearrayToString(body)
+		helpers.Write(w, bodystring, resp.StatusCode)
+		return
+	}
+
+	// Here goes AV analysis
+	// Currently none
+
+	_, err = io.Copy(w, att.Body)
+	if err != nil {
+		helpers.Write(w, fmt.Sprint("Failed writing file to writer.", err.Error()), http.StatusInternalServerError)
+		return
+	}
 }
