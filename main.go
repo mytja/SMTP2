@@ -28,7 +28,7 @@ func main() {
 
 	command.Flags().BoolVar(&config.Debug, "debug", false, "enable debug mode")
 	command.Flags().StringVar(&config.Host, "host", "0.0.0.0", "set server host")
-	command.Flags().StringVar(&config.Port, "port", "8080", "set server port")
+	command.Flags().StringVar(&config.Port, "port", "80", "set server port")
 	command.Flags().StringVar(&constants.ServerUrl, "url", "http://0.0.0.0:8080", "set server URL")
 	command.Flags().StringVar(&config.DBConfig, "dbconfig", "smtp2.db", "set DB name")
 	command.Flags().StringVar(&config.HostURL, "hosturl", "", "What should be shown after @ symbol")
@@ -59,7 +59,7 @@ func main() {
 		}
 		config.Port = os.Getenv("Port")
 		if config.Port == "" {
-			config.Port = "8080"
+			config.Port = "80"
 		}
 		constants.ServerUrl = os.Getenv("ServerURL")
 		if constants.ServerUrl == "" {
