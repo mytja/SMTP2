@@ -1,10 +1,11 @@
-FROM golang:1.16-alpine AS builder
+FROM 17-alpine3.12 AS builder
 
 COPY . /app
 
 WORKDIR /app
 
 RUN go mod download && \
+    go env -w GOFLAGS=-mod=mod && \
     go build .
 
 FROM alpine:latest
