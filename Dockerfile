@@ -5,7 +5,7 @@ COPY . /app
 WORKDIR /app
 
 RUN go mod download && \
-    go env -w GOFLAGS=-mod=mod
+    go env -w GOFLAGS=-mod=mod && \
     go build .
 
 FROM alpine:latest
