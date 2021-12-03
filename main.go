@@ -142,11 +142,10 @@ func main() {
 	serve := config.Host + ":" + config.Port
 	sugared.Info("Serving on following URL: " + serve)
 
-	header := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "X-Login-Token"})
 	methods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "HEAD", "OPTIONS", "DELETE"})
 	origins := handlers.AllowedOrigins([]string{"*"})
 
-	err = http.ListenAndServe(serve, handlers.CORS(header, methods, origins)(r))
+	err = http.ListenAndServe(serve, handlers.CORS(methods, origins)(r))
 	if err != nil {
 		sugared.Fatal(err.Error())
 	}
