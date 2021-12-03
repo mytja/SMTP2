@@ -88,8 +88,9 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 
 	msg := sql.NewReceivedMessage(msgid, title, uri, to, from, atoi, pass, "", mvppass)
 
-	verification, _ := security.VerifyMessage(msg)
+	verification, err := security.VerifyMessage(msg)
 	if !verification {
+		server.logger.Infow("failed to verify", "error", err)
 		helpers.Write(w, "Failed to verify message.", http.StatusForbidden)
 		return
 	}

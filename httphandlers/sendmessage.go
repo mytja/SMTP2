@@ -204,6 +204,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
+			fmt.Println(err)
 			result["Body"] = "Remote server isn't available at the moment. Failed to send message."
 			result["To"] = to
 			result["StatusCode"] = -1
@@ -211,7 +212,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			break
 		}
 
-		server.logger.Infow("requesting to "+to, "url", req.Header.Get("URI"), "domain", reqdom)
+		server.logger.Infow("requesting to "+to, "mail_url", req.Header.Get("URI"), "domain", reqdom)
 
 		body3, _ := ioutil.ReadAll(res.Body)
 		result["Body"] = helpers.BytearrayToString(body3)
@@ -221,6 +222,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 
 		server.logger.Info(helpers.BytearrayToString(body3))
 		if res.StatusCode == http.StatusCreated {
+			// Mogoče dodaj tukaj kej
 		} else if res.StatusCode == http.StatusNotAcceptable || constants.EnableDeletingOnUnknownError {
 			server.db.DeleteMessage(basemsg.ID)
 			server.db.DeleteSentMessage(msg.ID)
