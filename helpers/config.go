@@ -8,4 +8,5 @@ type ServerConfig struct {
 	HTTPSEnabled bool
 	DBDriver     string
 	DBConfig     string
+	AV_URL       string
 }

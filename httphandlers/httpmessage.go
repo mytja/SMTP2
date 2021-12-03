@@ -121,11 +121,15 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 		server.logger.Info(err)
 		return
 	}
+	protocol := "http://"
+	if server.config.HTTPSEnabled {
+		protocol = "https://"
+	}
 	var m []map[string]string
 	for i := 0; i < len(inbox); i++ {
 		var m1 = make(map[string]string)
 		var msg sql.ReceivedMessage = inbox[i]
-		m1["URI"] = msg.URI
+		m1["URI"] = protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID)
 		m1["To"] = msg.ToEmail
 		m1["From"] = msg.FromEmail
 		m1["Title"] = msg.Title

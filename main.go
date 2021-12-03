@@ -33,6 +33,7 @@ func main() {
 	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
 	command.Flags().StringVar(&config.DBDriver, "dbname", "sqlite3", "DB Driver name")
 	command.Flags().BoolVar(&useenv, "useenv", false, "Use environment variables and ignore this selection")
+	command.Flags().StringVar(&config.AV_URL, "avurl", "", "Antivirus URL with endpoint to scan")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -68,6 +69,7 @@ func main() {
 			config.DBDriver = "sqlite3"
 		}
 		config.HostURL = os.Getenv("SMTP2_HOST_URL")
+		config.AV_URL = os.Getenv("SMTP2_AV_URL")
 	}
 	if config.HostURL == "" {
 		// This means it's running in localhost
@@ -142,10 +144,9 @@ func main() {
 	serve := config.Host + ":" + config.Port
 	sugared.Info("Serving on following URL: " + serve)
 
-	methods := handlers.AllowedMethods([]string{"GET", "POST", "PUT", "HEAD", "OPTIONS", "DELETE"})
 	origins := handlers.AllowedOrigins([]string{"*"})
 
-	err = http.ListenAndServe(serve, handlers.CORS(methods, origins)(r))
+	err = http.ListenAndServe(serve, handlers.CORS(origins)(r))
 	if err != nil {
 		sugared.Fatal(err.Error())
 	}

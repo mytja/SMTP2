@@ -25,6 +25,21 @@ type MessagePayload struct {
 	Attachments []map[string]string `json:"Attachments"`
 }
 
+type AttachmentAnalysisResult struct {
+	Name       string   `json:"name"`
+	IsInfected bool     `json:"is_infected"`
+	Viruses    []string `json:"viruses"`
+}
+
+type AttachmentAnalysisData struct {
+	Result []AttachmentAnalysisResult `json:"result"`
+}
+
+type AttachmentAnalysis struct {
+	Success bool                   `json:"success"`
+	Data    AttachmentAnalysisData `json:"data"`
+}
+
 func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("file")
 	if err != nil {
@@ -419,7 +434,33 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 	}
 
 	// Here goes AV analysis
-	// Currently none
+	var analysisresult AttachmentAnalysis
+	fmt.Println(server.config.AV_URL)
+	avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
+	if err != nil {
+		helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
+		return
+	}
+	avbody, err := ioutil.ReadAll(avreq.Body)
+	if err != nil {
+		helpers.Write(w, "Failed to read response body from AV scan", http.StatusInternalServerError)
+		return
+	}
+	err = json.Unmarshal(avbody, &analysisresult)
+	if err != nil {
+		fmt.Println(err)
+		helpers.Write(w, "Failed to unmarshal AV response", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(analysisresult)
+	if !analysisresult.Success {
+		helpers.Write(w, "AV scan failed", http.StatusInternalServerError)
+		return
+	}
+	if analysisresult.Data.Result[0].IsInfected {
+		helpers.Write(w, fmt.Sprint("This file is infected with malware", analysisresult.Data.Result[0].Viruses[0]), http.StatusInternalServerError)
+		return
+	}
 
 	_, err = io.Copy(w, att.Body)
 	if err != nil {
