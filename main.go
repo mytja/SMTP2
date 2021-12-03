@@ -5,7 +5,6 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
 	"github.com/spf13/cobra"
@@ -29,7 +28,6 @@ func main() {
 	command.Flags().BoolVar(&config.Debug, "debug", false, "enable debug mode")
 	command.Flags().StringVar(&config.Host, "host", "0.0.0.0", "set server host")
 	command.Flags().StringVar(&config.Port, "port", "80", "set server port")
-	command.Flags().StringVar(&constants.ServerUrl, "url", "http://0.0.0.0:8080", "set server URL")
 	command.Flags().StringVar(&config.DBConfig, "dbconfig", "smtp2.db", "set DB name")
 	command.Flags().StringVar(&config.HostURL, "hosturl", "", "What should be shown after @ symbol")
 	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
@@ -41,39 +39,35 @@ func main() {
 		return
 	}
 	if useenv == true {
-		debug := os.Getenv("Debug")
+		debug := os.Getenv("SMTP2_DEBUG")
 		if debug == "" {
 			config.Debug = false
 		} else {
 			config.Debug = true
 		}
-		httpsenabled := os.Getenv("HTTPSEnabled")
+		httpsenabled := os.Getenv("SMTP2_HTTPS_ENABLED")
 		if httpsenabled == "" {
 			config.HTTPSEnabled = false
 		} else {
 			config.HTTPSEnabled = true
 		}
-		config.Host = os.Getenv("Host")
+		config.Host = os.Getenv("SMTP2_HOST")
 		if config.Host == "" {
 			config.Host = "0.0.0.0"
 		}
-		config.Port = os.Getenv("Port")
+		config.Port = os.Getenv("SMTP2_PORT")
 		if config.Port == "" {
 			config.Port = "80"
 		}
-		constants.ServerUrl = os.Getenv("ServerURL")
-		if constants.ServerUrl == "" {
-			constants.ServerUrl = "http://0.0.0.0:8080"
-		}
-		config.DBConfig = os.Getenv("DBConfig")
+		config.DBConfig = os.Getenv("SMTP2_DB_CONFIG")
 		if config.DBConfig == "" {
 			config.DBConfig = "smtp2.db"
 		}
-		config.DBDriver = os.Getenv("DBName")
+		config.DBDriver = os.Getenv("SMTP2_DB_NAME")
 		if config.DBDriver == "" {
 			config.DBDriver = "sqlite3"
 		}
-		config.HostURL = os.Getenv("HostURL")
+		config.HostURL = os.Getenv("SMTP2_HOST_URL")
 	}
 	if config.HostURL == "" {
 		// This means it's running in localhost

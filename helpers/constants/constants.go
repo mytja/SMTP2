@@ -15,6 +15,5 @@ const ForceHttpsForMailDomain = false
 const EnableDeletingOnUnknownError = true
 
 var (
-	ServerUrl string
-	DbName    string
+	DbName string
 )
