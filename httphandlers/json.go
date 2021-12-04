@@ -14,6 +14,10 @@ type MessagePayload struct {
 	Attachments []Attachment `json:"Attachments"`
 }
 
+type ServerInfo struct {
+	HasHTTPS bool `json:"hasHTTPS"`
+}
+
 type AttachmentAnalysisResult struct {
 	Name       string   `json:"name"`
 	IsInfected bool     `json:"is_infected"`
