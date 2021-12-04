@@ -21,35 +21,31 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	fromemail, err := helpers.GetDomainFromEmail(from)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve domain from email", Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if fromemail != server.config.HostURL {
-		helpers.Write(w, "This server doesn't hold your domain.", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "This server doesn't hold your domain.", Success: false}, http.StatusForbidden)
 		return
 	}
-	server.logger.Info(fmt.Sprint(fromemail, " ", server.config.HostURL))
+	server.logger.Debug(fmt.Sprint(fromemail, " ", server.config.HostURL))
 
 	replytoid, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "ID isn't a integer", Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	replytomsg, err := server.db.GetMessageFromReplyTo(replytoid)
 	if err != nil {
-		helpers.Write(w, "Failed retrieving original message", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed retrieving original message", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
@@ -58,14 +54,14 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	if replytomsg.Type == "sent" {
 		message, err := server.db.GetSentMessage(replytoid)
 		if err != nil {
-			helpers.Write(w, "Failed to retrieve Sent message.", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to retrieve Sent message.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		to = message.ToEmail
 	} else {
 		message, err := server.db.GetReceivedMessage(replytoid)
 		if err != nil {
-			helpers.Write(w, "Failed to retrieve Received message.", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to retrieve Received message.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		to = message.FromEmail
@@ -73,28 +69,28 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 
 	todomain, err := helpers.GetDomainFromEmail(to)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve domain from to email", Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	// Check if website has enabled HTTPS
 	resp, err := http.Get("http://" + todomain + "/smtp2/server/info")
 	if err != nil {
-		helpers.Write(w, "Remote server isn't avaiable at the moment. Failed to send message.", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Remote server isn't avaiable at the moment. Failed to send message.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 	}
 	reqbody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read response body", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	resjson := make(map[string]interface{})
+	var resjson ServerInfo
 	err = json.Unmarshal(reqbody, &resjson)
 	if err != nil {
-		helpers.Write(w, "Failed to unmarshal remote server's response.", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to unmarshal remote server's response.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	protocol := "http://"
-	if resjson["hasHTTPS"] == true {
+	if resjson.HasHTTPS {
 		protocol = "https://"
 	}
 
@@ -109,32 +105,32 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
 	err = server.db.CommitMessage(basemsg)
 	if err != nil {
-		helpers.Write(w, "Failed while committing message base", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed while committing message base", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	// Generate random password
 	pass, err := security.GenerateRandomString(80)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random string", Success: false}, http.StatusInternalServerError)
 		return
 	}
 	mvppass, err := security.GenerateRandomString(80)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random string", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	reply := sql.NewSentMessage(id, title, to, from, body, pass, mvppass)
-	server.logger.Info(reply)
+	server.logger.Debug(reply)
 	err = server.db.CommitSentMessage(reply)
 	if err != nil {
-		helpers.Write(w, "Failed to commit Sent message", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to commit Sent message", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	// Now let's send a request to a recipient email server
-	server.logger.Info(todomain)
+	server.logger.Debug(todomain)
 
 	urlprotocol := "http://"
 	if server.config.HTTPSEnabled {
@@ -159,23 +155,23 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusForbidden)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to request to remote server", Success: false}, http.StatusForbidden)
 		return
 	}
 	if res.StatusCode == http.StatusCreated {
 		// And let's make a 201 response
-		helpers.Write(w, "OK", http.StatusCreated)
+		WriteJSON(w, Response{Data: "OK", Success: true}, http.StatusCreated)
 		return
 	}
 
 	body2, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		helpers.Write(w, "Error while reading request body", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Error while reading request body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if res.StatusCode == http.StatusNotAcceptable {
 		server.logger.Error("Server has denied message")
-		helpers.Write(w, helpers.BytearrayToString(body2), http.StatusNotAcceptable)
+		WriteJSON(w, Response{Data: helpers.BytearrayToString(body2), Success: false}, http.StatusNotAcceptable)
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
 		return
@@ -186,5 +182,5 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
 	}
-	helpers.Write(w, "Unknown error: "+fmt.Sprint(res.StatusCode)+" - "+helpers.BytearrayToString(body2), http.StatusInternalServerError)
+	WriteJSON(w, Response{Data: res.StatusCode, Error: "Unknown error: " + helpers.BytearrayToString(body2), Success: false}, http.StatusInternalServerError)
 }
