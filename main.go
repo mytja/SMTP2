@@ -33,7 +33,7 @@ func main() {
 	command.Flags().BoolVar(&config.HTTPSEnabled, "https", false, "Is https enabled for following domain")
 	command.Flags().StringVar(&config.DBDriver, "dbname", "sqlite3", "DB Driver name")
 	command.Flags().BoolVar(&useenv, "useenv", false, "Use environment variables and ignore this selection")
-	command.Flags().StringVar(&config.AV_URL, "avurl", "", "Antivirus URL with endpoint to scan")
+	command.Flags().StringVar(&config.AV_URL, "avurl", "http://clamapi:3000/api/v1/scan", "Antivirus URL with endpoint to scan")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -70,6 +70,9 @@ func main() {
 		}
 		config.HostURL = os.Getenv("SMTP2_HOST_URL")
 		config.AV_URL = os.Getenv("SMTP2_AV_URL")
+		if config.AV_URL == "" {
+			config.AV_URL = "http://clamapi:3000/api/v1/scan"
+		}
 	}
 	if config.HostURL == "" {
 		// This means it's running in localhost

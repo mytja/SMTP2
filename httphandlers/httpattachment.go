@@ -349,6 +349,7 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 }
 
 func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request) {
+	skipav := r.URL.Query().Get("skipav")
 	ok, from, err := crypto2.CheckUser(r)
 	if err != nil {
 		helpers.Write(w, err.Error(), http.StatusInternalServerError)
@@ -433,33 +434,40 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		return
 	}
 
-	// Here goes AV analysis
-	var analysisresult AttachmentAnalysis
-	fmt.Println(server.config.AV_URL)
-	avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
-	if err != nil {
-		helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
-		return
-	}
-	avbody, err := ioutil.ReadAll(avreq.Body)
-	if err != nil {
-		helpers.Write(w, "Failed to read response body from AV scan", http.StatusInternalServerError)
-		return
-	}
-	err = json.Unmarshal(avbody, &analysisresult)
-	if err != nil {
-		fmt.Println(err)
-		helpers.Write(w, "Failed to unmarshal AV response", http.StatusInternalServerError)
-		return
-	}
-	fmt.Println(analysisresult)
-	if !analysisresult.Success {
-		helpers.Write(w, "AV scan failed", http.StatusInternalServerError)
-		return
-	}
-	if analysisresult.Data.Result[0].IsInfected {
-		helpers.Write(w, fmt.Sprint("This file is infected with malware", analysisresult.Data.Result[0].Viruses[0]), http.StatusInternalServerError)
-		return
+	if skipav != "1" {
+		// Here goes AV analysis
+		var analysisresult AttachmentAnalysis
+		fmt.Println(server.config.AV_URL)
+		avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
+		if err != nil {
+			helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
+			return
+		}
+		avresp, err := http.DefaultClient.Do(avreq)
+		if err != nil {
+			helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
+			return
+		}
+		avbody, err := ioutil.ReadAll(avresp.Body)
+		if err != nil {
+			helpers.Write(w, "Failed to read response body from AV scan", http.StatusInternalServerError)
+			return
+		}
+		err = json.Unmarshal(avbody, &analysisresult)
+		if err != nil {
+			fmt.Println(err)
+			helpers.Write(w, "Failed to unmarshal AV response", http.StatusInternalServerError)
+			return
+		}
+		fmt.Println(analysisresult)
+		if !analysisresult.Success {
+			helpers.Write(w, "AV scan failed", http.StatusInternalServerError)
+			return
+		}
+		if analysisresult.Data.Result[0].IsInfected {
+			helpers.Write(w, fmt.Sprint("This file is infected with malware", analysisresult.Data.Result[0].Viruses[0]), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	_, err = io.Copy(w, att.Body)
