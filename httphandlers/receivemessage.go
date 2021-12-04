@@ -24,18 +24,18 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	originalid := q.Get("OriginalID")
 	mvppass := q.Get("MVPPass")
 	if replyid == "" || replypass == "" || mvppass == "" {
-		helpers.Write(w, "Bad request", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Bad request", Success: false}, http.StatusBadRequest)
 		return
 	}
 	server.logger.Info(fmt.Sprint(id, title, uri, to, from, mvppass))
 	atoi, err := strconv.Atoi(id)
 	if err != nil {
-		helpers.Write(w, "ID isn't a valid integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "ID isn't a valid integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 	originalidint, err := strconv.Atoi(originalid)
 	if err != nil {
-		helpers.Write(w, "OriginalID isn't a valid integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "OriginalID isn't a valid integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 			originalidint = -1
 			isOriginal = true
 		} else {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve original message from your reply headers", Success: false}, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -55,30 +55,30 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 		if originalmessage.Type == "sent" {
 			originalmsg, err := server.db.GetSentMessage(originalmessage.ID)
 			if err != nil {
-				helpers.Write(w, "Unable to retrieve original message from SentMessages.", http.StatusInternalServerError)
+				WriteJSON(w, Response{Error: err.Error(), Data: "Unable to retrieve original message from SentMessages.", Success: false}, http.StatusInternalServerError)
 				return
 			}
 			if !(originalmsg.ToEmail == from && originalmsg.FromEmail == to) {
-				helpers.Write(w, "You didn't send this message...", http.StatusNotAcceptable)
+				WriteJSON(w, Response{Data: "You didn't send this message...", Success: false}, http.StatusNotAcceptable)
 				return
 			}
 		} else {
 			originalmsg, err := server.db.GetReceivedMessage(originalmessage.ID)
 			if err != nil {
 				server.logger.Info(err)
-				helpers.Write(w, "Unable to retrieve original message from ReceivedMessages.", http.StatusInternalServerError)
+				WriteJSON(w, Response{Data: "Unable to retrieve original message from ReceivedMessages.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 				return
 			}
 			if !(originalmsg.ToEmail == to && originalmsg.FromEmail == from) {
-				helpers.Write(w, "You didn't send this message...", http.StatusNotAcceptable)
+				WriteJSON(w, Response{Data: "You didn't send this message...", Success: false}, http.StatusNotAcceptable)
 				return
 			}
 		}
 	}
 	_, err = server.db.GetUserByEmail(to)
 	if err != nil {
-		helpers.Write(w,
-			fmt.Sprint("Could not find recipient in our database or there was an internal error in recipient's database: ", err.Error()),
+		WriteJSON(w,
+			Response{Data: "Could not find recipient in our database or there was an internal error in recipient's database: ", Error: err.Error(), Success: false},
 			http.StatusNotAcceptable,
 		)
 		return
@@ -91,12 +91,12 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	verification, err := security.VerifyMessage(msg)
 	if !verification {
 		server.logger.Infow("failed to verify", "error", err)
-		helpers.Write(w, "Failed to verify message.", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Failed to verify message.", Success: false}, http.StatusForbidden)
 		return
 	}
 	domain, err := helpers.GetDomainFromEmail(from)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve domain from FromEmail", Success: false}, http.StatusBadRequest)
 		return
 	}
 	fromurl, err := tld.Parse(domain)
@@ -117,12 +117,13 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	// Commit
 	err = server.db.CommitMessage(basemsg)
 	if err != nil {
-		helpers.Write(w, fmt.Sprint("Failed commiting base message to database", err.Error()), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed commiting base message to database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	err = server.db.CommitReceivedMessages(msg)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		server.logger.Error("Failed to commit received message")
+		WriteJSON(w, Response{Data: "[FATAL] Failed to commit received message", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	helpers.Write(w, "Created", http.StatusCreated)

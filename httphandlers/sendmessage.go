@@ -286,5 +286,5 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			}
 		}
 	}
-	WriteJSON(w, responseMap, http.StatusCreated)
+	WriteJSON(w, Response{Data: responseMap, Success: true}, http.StatusCreated)
 }
