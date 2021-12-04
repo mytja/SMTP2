@@ -22,22 +22,18 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	usedraft := r.FormValue("DraftID")
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	fromemail, err := helpers.GetDomainFromEmail(from)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to parse email address to get domain", Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if fromemail != server.config.HostURL {
-		helpers.Write(w, "This server doesn't hold your domain.", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "This server doesn't hold your domain.", Success: false}, http.StatusForbidden)
 		return
 	}
 	server.logger.Infow("config", "from", fromemail, "hosturl", server.config.HostURL)
@@ -50,25 +46,25 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	if usedraft != "" {
 		draftid, err = strconv.Atoi(usedraft)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusBadRequest)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to parse provided DraftID to integer", Success: false}, http.StatusBadRequest)
 			return
 		}
 		message, err := server.db.GetSentMessage(draftid)
 		if err != nil {
-			helpers.Write(w, "Failed to retrieve draft from database", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to retrieve draft from database", Success: false, Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}
 		if message.FromEmail != from {
-			helpers.Write(w, "You didn't create this draft...", http.StatusForbidden)
+			WriteJSON(w, Response{Data: "You didn't create this draft...", Success: false}, http.StatusForbidden)
 			return
 		}
 		basemsg, err := server.db.GetMessageFromReplyTo(draftid)
 		if err != nil {
-			helpers.Write(w, "Failed to retrieve draft base from database", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to retrieve draft base from database", Success: false, Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}
 		if !basemsg.IsDraft {
-			helpers.Write(w, "This isn't a draft anymore...", http.StatusBadRequest)
+			WriteJSON(w, Response{Data: "This isn't a draft anymore...", Success: false}, http.StatusBadRequest)
 			return
 		}
 		iscreatedfromdraft = true
@@ -81,7 +77,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	if !strings.Contains(to, "@") {
-		helpers.Write(w, "Invalid To address", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Invalid To address", Success: false}, http.StatusBadRequest)
 		return
 	}
 
@@ -92,24 +88,26 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		to = tolist[i]
 
 		// Generate different passwords for different recipients
+		// TODO: Migrate this to break statements
 		pass, err := security.GenerateRandomString(80)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			// This is a fatal error, thus we return and not just break
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
 		replyPass, err := security.GenerateRandomString(80)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
 		replyID, err := security.GenerateRandomString(80)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
 		mvppass, err := security.GenerateRandomString(80)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
 
@@ -117,9 +115,10 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 
 		var result = make(map[string]interface{})
 
+		// TODO: Migrate this to break statements
 		todomain, err := helpers.GetDomainFromEmail(to)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusBadRequest)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to get domain from to email", Success: false}, http.StatusBadRequest)
 			return
 		}
 
@@ -161,6 +160,33 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			result["StatusCode"] = -1
 			responseMap = append(responseMap, result)
 			break
+		}
+
+		if iscreatedfromdraft == true {
+			server.logger.Debug("migrating all attachments to this message")
+			attachments, err := server.db.GetAllAttachments(draftid)
+			if err != nil {
+				result["Body"] = "Failed to retrieve attachments from database. " + err.Error()
+				result["To"] = to
+				result["StatusCode"] = -1
+				responseMap = append(responseMap, result)
+				break
+			}
+			for i := 0; i < len(attachments); i++ {
+				attachment := attachments[i]
+				// Generate new unique ID
+				attachment.ID = server.db.GetLastAttachmentID()
+				// Assign new message ID
+				attachment.MessageID = id
+				err := server.db.CommitAttachment(attachment)
+				if err != nil {
+					result["Body"] = "Failed to commit attachment from database. " + err.Error()
+					result["To"] = to
+					result["StatusCode"] = -1
+					responseMap = append(responseMap, result)
+					break
+				}
+			}
 		}
 
 		msg := sql.NewSentMessage(id, title, to, from, body, pass, mvppass)
@@ -233,7 +259,32 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		server.logger.Infow("deleting draft message", "id", draftid)
 		server.db.DeleteMessage(draftid)
 		server.db.DeleteSentMessage(draftid)
+		attachments, err := server.db.GetAllAttachments(draftid)
+		if err != nil {
+			WriteJSON(
+				w,
+				Response{
+					Error:   err.Error(),
+					Data:    "Failed to retrieve all attachments from database. Your message was still sent",
+					Success: false,
+				},
+				http.StatusInternalServerError,
+			)
+		}
+		for i := 0; i < len(attachments); i++ {
+			err := server.db.DeleteAttachment(draftid, attachments[0].ID)
+			if err != nil {
+				WriteJSON(
+					w,
+					Response{
+						Data:    "Failed to delete old attachments from database. Your message was sent anyways",
+						Error:   err.Error(),
+						Success: false,
+					},
+					http.StatusInternalServerError,
+				)
+			}
+		}
 	}
-	marshal, _ := json.Marshal(responseMap)
-	helpers.Write(w, helpers.BytearrayToString(marshal), http.StatusCreated)
+	WriteJSON(w, responseMap, http.StatusCreated)
 }
