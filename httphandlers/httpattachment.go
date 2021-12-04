@@ -16,69 +16,46 @@ import (
 	"strconv"
 )
 
-type MessagePayload struct {
-	ID          string              `json:"ID"`
-	Title       string              `json:"Title"`
-	Receiver    string              `json:"Receiver"`
-	Sender      string              `json:"Sender"`
-	Body        string              `json:"Body"`
-	Attachments []map[string]string `json:"Attachments"`
-}
-
-type AttachmentAnalysisResult struct {
-	Name       string   `json:"name"`
-	IsInfected bool     `json:"is_infected"`
-	Viruses    []string `json:"viruses"`
-}
-
-type AttachmentAnalysisData struct {
-	Result []AttachmentAnalysisResult `json:"result"`
-}
-
-type AttachmentAnalysis struct {
-	Success bool                   `json:"success"`
-	Data    AttachmentAnalysisData `json:"data"`
-}
-
 func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("file")
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve FormFile", Success: false}, http.StatusBadRequest)
+		return
 	}
 
 	id := mux.Vars(r)["id"]
 	idint, err := strconv.Atoi(id)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "ID isn't a integer", Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	message, err := server.db.GetSentMessage(idint)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve message", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve message", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	if message.FromEmail != from {
-		helpers.Write(w, "You didn't create this message...", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "You didn't create this message...", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	pass, err := security.GenerateRandomString(80)
 	if err != nil {
-		helpers.Write(
+		WriteJSON(
 			w,
-			"Failed to generate random password. This is completely server's fault",
+			Response{
+				Data:    "Failed to generate random password. This is completely server's fault",
+				Error:   err.Error(),
+				Success: false,
+			},
 			http.StatusInternalServerError,
 		)
 		return
@@ -92,29 +69,31 @@ func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	if _, err := os.Stat("attachments/"); errors.Is(err, os.ErrNotExist) {
-		fmt.Println("Creating attachments directory")
+		server.logger.Debug("Creating attachments directory")
 		err := os.Mkdir("attachments", 0755)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to create attachments directory", Success: false}, http.StatusInternalServerError)
+			return
 		}
 	}
 
 	if _, err := os.Stat("attachments/" + id + "/"); errors.Is(err, os.ErrNotExist) {
-		fmt.Println("Creating message directory")
+		server.logger.Debug("Creating message directory")
 		err := os.Mkdir("attachments/"+id, 0755)
 		if err != nil {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to create message directory", Success: false}, http.StatusInternalServerError)
+			return
 		}
 	}
 
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to open file", Success: false}, http.StatusInternalServerError)
 		return
 	}
 	_, err = io.Copy(f, file)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to copy attachment to file", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
@@ -122,116 +101,109 @@ func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	err = server.db.CommitAttachment(newattachment)
 	if err != nil {
-		helpers.Write(w, "Failed to commit attachment to database", http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit attachment to database", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
-	helpers.Write(w, handler.Filename+" has been successfully uploaded", http.StatusCreated)
+	WriteJSON(w, Response{Data: handler.Filename + " has been successfully uploaded", Success: true}, http.StatusCreated)
 }
 
 func (server *httpImpl) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
-		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Message ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	aid := mux.Vars(r)["aid"]
 	aidint, err := strconv.Atoi(aid)
 	if err != nil {
-		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Attachment ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	sentmsg, err := server.db.GetSentMessage(midint)
 	if err != nil {
-		helpers.Write(w, "", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve sent message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	if sentmsg.FromEmail != from {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Forbidden", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve attachment from database", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	err = os.Remove(attachment.Filename)
 	if err != nil {
-		helpers.Write(w, fmt.Sprint("Error while trying to remove file", err.Error()), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Error while trying to remove file", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	err = server.db.DeleteAttachment(midint, aidint)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to delete attachment from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
-	helpers.Write(w, "Successfully deleted following file.", http.StatusOK)
+	WriteJSON(w, Response{Data: "Successfully deleted following file.", Success: true}, http.StatusOK)
 }
 
+// GetAttachment Sender retrieves attachment on its own server
 func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
-		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Message ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	aid := mux.Vars(r)["aid"]
 	aidint, err := strconv.Atoi(aid)
 	if err != nil {
-		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Attachment ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	sentmsg, err := server.db.GetSentMessage(midint)
 	if err != nil {
-		helpers.Write(w, "", http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve sent message from database", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	if sentmsg.FromEmail != from {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Forbidden", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve attachment from database", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	Openfile, err := os.Open(attachment.Filename)
 	defer Openfile.Close()
 	if err != nil {
-		helpers.Write(w, "File not found.", http.StatusNotFound)
+		WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 
@@ -243,7 +215,7 @@ func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	//Copy the headers into the FileHeader buffer
 	_, err = Openfile.Read(FileHeader)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read file", Success: false}, http.StatusInternalServerError)
 		return
 	}
 	//Get content type of file
@@ -263,29 +235,29 @@ func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	//We read 512 bytes from the file already, so we reset the offset back to 0
 	_, err = Openfile.Seek(0, 0)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	_, err = io.Copy(w, Openfile)
 	if err != nil {
-		helpers.Write(w, fmt.Sprint("Failed writing file to writer.", err.Error()), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
+// RetrieveAttachment Recipient retrieves attachment from sender's server
 func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Request) {
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
-		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Message ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	aid := mux.Vars(r)["aid"]
 	aidint, err := strconv.Atoi(aid)
 	if err != nil {
-		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Attachment ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
@@ -293,18 +265,18 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 
 	attachment, err := server.db.GetAttachment(midint, aidint)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if attachment.AttachmentPass != pass {
-		helpers.Write(w, "Attachment password isn't matching to one saved in database", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Attachment password isn't matching to one saved in database", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	Openfile, err := os.Open(attachment.Filename)
 	defer Openfile.Close()
 	if err != nil {
-		helpers.Write(w, "File not found.", http.StatusNotFound)
+		WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 
@@ -316,7 +288,7 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 	//Copy the headers into the FileHeader buffer
 	_, err = Openfile.Read(FileHeader)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	//Get content type of file
@@ -337,73 +309,68 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 	//We read 512 bytes from the file already, so we reset the offset back to 0
 	_, err = Openfile.Seek(0, 0)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	_, err = io.Copy(w, Openfile)
 	if err != nil {
-		helpers.Write(w, fmt.Sprint("Failed writing file to writer.", err.Error()), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request) {
 	skipav := r.URL.Query().Get("skipav")
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	mid := mux.Vars(r)["mid"]
 	midint, err := strconv.Atoi(mid)
 	if err != nil {
-		helpers.Write(w, "Message ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Message ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	aid := mux.Vars(r)["aid"]
 	_, err = strconv.Atoi(aid)
 	if err != nil {
-		helpers.Write(w, "Attachment ID isn't a proper integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Attachment ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	message, err := server.db.GetReceivedMessage(midint)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve SentMessage from database", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve SentMessage from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	if message.ToEmail != from {
-		helpers.Write(w, "This message doesn't belong to you", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "This message doesn't belong to you", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	resp, err := http.Get(message.URI)
 	if err != nil {
-		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	bodystring := helpers.BytearrayToString(body)
 	if resp.StatusCode != http.StatusOK {
-		helpers.Write(w, bodystring, resp.StatusCode)
+		WriteJSON(w, Response{Data: bodystring, Success: false}, resp.StatusCode)
 		return
 	}
 	var j MessagePayload
 	err = json.Unmarshal(body, &j)
 	if err != nil {
-		helpers.Write(w, "Failed to unmarshal response body", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to unmarshal response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	var attachments = j.Attachments
@@ -415,22 +382,22 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		}
 	}
 	if url == "" {
-		helpers.Write(w, "Could not find attachment with following ID", http.StatusNotFound)
+		WriteJSON(w, Response{Data: "Could not find attachment with following ID", Success: false}, http.StatusNotFound)
 		return
 	}
 	att, err := http.Get(url)
 	if err != nil {
-		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if att.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		bodystring := helpers.BytearrayToString(body)
-		helpers.Write(w, bodystring, resp.StatusCode)
+		WriteJSON(w, Response{Error: bodystring, Success: false}, resp.StatusCode)
 		return
 	}
 
@@ -440,39 +407,37 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		fmt.Println(server.config.AV_URL)
 		avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
 		if err != nil {
-			helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		avresp, err := http.DefaultClient.Do(avreq)
 		if err != nil {
-			helpers.Write(w, "Failed to make a request to AV", http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		avbody, err := ioutil.ReadAll(avresp.Body)
 		if err != nil {
-			helpers.Write(w, "Failed to read response body from AV scan", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to read response body from AV scan", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
 		err = json.Unmarshal(avbody, &analysisresult)
 		if err != nil {
-			fmt.Println(err)
-			helpers.Write(w, "Failed to unmarshal AV response", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "Failed to unmarshal AV response", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
-		fmt.Println(analysisresult)
 		if !analysisresult.Success {
-			helpers.Write(w, "AV scan failed", http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "AV scan failed", Success: false, Error: "AV scan failed"}, http.StatusBadGateway)
 			return
 		}
 		if analysisresult.Data.Result[0].IsInfected {
-			helpers.Write(w, fmt.Sprint("This file is infected with malware", analysisresult.Data.Result[0].Viruses[0]), http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "This file is infected with malware", Error: analysisresult.Data.Result[0].Viruses[0], Success: false}, http.StatusInternalServerError)
 			return
 		}
 	}
 
 	_, err = io.Copy(w, att.Body)
 	if err != nil {
-		helpers.Write(w, fmt.Sprint("Failed writing file to writer.", err.Error()), http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 }
