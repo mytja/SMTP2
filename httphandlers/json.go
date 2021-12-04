@@ -6,12 +6,12 @@ import (
 )
 
 type MessagePayload struct {
-	ID          string              `json:"ID"`
-	Title       string              `json:"Title"`
-	Receiver    string              `json:"Receiver"`
-	Sender      string              `json:"Sender"`
-	Body        string              `json:"Body"`
-	Attachments []map[string]string `json:"Attachments"`
+	ID          string       `json:"ID"`
+	Title       string       `json:"Title"`
+	Receiver    string       `json:"Receiver"`
+	Sender      string       `json:"Sender"`
+	Body        string       `json:"Body"`
+	Attachments []Attachment `json:"Attachments"`
 }
 
 type AttachmentAnalysisResult struct {
@@ -35,6 +35,46 @@ type Response struct {
 	Error   string      `json:"error"`
 }
 
+type MessageData struct {
+	ID       int    `json:"ID"`
+	ServerID int    `json:"ServerID"`
+	Title    string `json:"Title"`
+	URI      string `json:"URI"`
+	Receiver string `json:"Receiver"`
+	Sender   string `json:"Sender"`
+}
+
+type MessageDataResponse struct {
+	Response
+	Data MessageData `json:"data"`
+}
+
+type InboxDataResponse struct {
+	Response
+	Data []MessageData `json:"data"`
+}
+
+type ReceivedMessageData struct {
+	ID          int          `json:"ID"`
+	ServerID    int          `json:"ServerID"`
+	Title       string       `json:"Title"`
+	Receiver    string       `json:"Receiver"`
+	Sender      string       `json:"Sender"`
+	Attachments []Attachment `json:"Attachments"`
+	Body        string       `json:"body"`
+}
+
+type ReceivedMessageResponse struct {
+	Response
+	Data ReceivedMessageData `json:"body"`
+}
+
+type Attachment struct {
+	ID       int    `json:"ID"`
+	Filename string `json:"Filename"`
+	URL      string `json:"URL"`
+}
+
 func DumpJSON(jsonstruct interface{}) []byte {
 	marshal, _ := json.Marshal(jsonstruct)
 	return marshal
@@ -42,10 +82,12 @@ func DumpJSON(jsonstruct interface{}) []byte {
 
 func WriteJSON(w http.ResponseWriter, jsonstruct interface{}, statusCode int) {
 	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(DumpJSON(jsonstruct))
 }
 
 func WriteForbiddenJWT(w http.ResponseWriter, err error) {
 	w.WriteHeader(403)
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(DumpJSON(Response{Success: false, Data: "Forbidden", Error: err.Error()}))
 }

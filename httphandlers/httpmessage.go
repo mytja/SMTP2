@@ -14,64 +14,62 @@ import (
 
 func (server *httpImpl) GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
 	isAuth, email, err := crypto2.CheckUser(r)
-	if isAuth == false {
-		helpers.Write(w, "unauthenticated", http.StatusForbidden)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to convert ID to integer", Success: false}, http.StatusBadRequest)
 		return
 	}
 	message, err := server.db.GetReceivedMessage(id)
 	if err != nil {
-		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
+		WriteJSON(w, Response{Data: "Message doesn't exist or internal server error: ", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 	if message.ToEmail != email {
-		helpers.Write(w, "unauthenticated", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "You aren't the recipient of following message", Success: false}, http.StatusForbidden)
 		return
 	}
 	protocol := "http://"
 	if server.config.HTTPSEnabled {
 		protocol = "https://"
 	}
-	var m = make(map[string]string)
-	m["ID"] = fmt.Sprint(message.ID)
-	m["ServerID"] = fmt.Sprint(message.ServerID)
-	m["Title"] = message.Title
-	m["URI"] = protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(message.ID)
-	m["ServerPass"] = message.ServerPass
-	m["Receiver"] = message.ToEmail
-	m["Sender"] = message.FromEmail
-	w.Header().Set("Content-Type", "application/json")
-	response, _ := json.Marshal(m)
-	helpers.Write(w, helpers.BytearrayToString(response), http.StatusOK)
+	WriteJSON(w, MessageDataResponse{Data: MessageData{
+		ID:       message.ID,
+		ServerID: message.ServerID,
+		Title:    message.Title,
+		URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(message.ID),
+		Receiver: message.ToEmail,
+		Sender:   message.FromEmail,
+	}}, http.StatusOK)
 }
 
 func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	pass := r.URL.Query().Get("pass")
 	if pass == "" {
-		helpers.Write(w, "Bad request - pass wasn't specified", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Bad request - pass wasn't specified", Success: false}, http.StatusBadRequest)
 		return
 	}
 	message, err := server.db.GetSentMessage(id)
 	if err != nil {
-		helpers.Write(w, "Message doesn't exist or internal server error: "+err.Error(), http.StatusNotFound)
+		WriteJSON(w, Response{Data: "Message doesn't exist or internal server error", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 	basemessage, err := server.db.GetOriginalMessageFromOriginalID(id)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve base message from database: "+err.Error(), http.StatusNotFound)
+		WriteJSON(w, Response{Data: "Failed to retrieve base message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 	if basemessage.IsDraft {
-		helpers.Write(w, "This message is a draft and therefore, we should not give you any information.", http.StatusForbidden)
+		// Top secret on a FBI level - highly classified, you can go to jail if you tell anybody about this :wink: :rofl:
+		WriteJSON(w, Response{Data: "This message is a draft and therefore, we should not give you any information.", Success: false}, http.StatusForbidden)
 		return
 	}
 	if message.Pass != pass {
-		helpers.Write(w, "Could not confirm Message password", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Could not confirm Message password", Success: false}, http.StatusForbidden)
 		return
 	}
 
@@ -82,37 +80,33 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 
 	attachments, err := server.db.GetAllAttachments(id)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve attachments from database", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	var attachmentsmap = make([]map[string]interface{}, 0)
+	var attachmentsmap = ReceivedMessageResponse{Data: ReceivedMessageData{
+		ID:          message.ID,
+		Title:       message.Title,
+		Receiver:    message.ToEmail,
+		Sender:      message.FromEmail,
+		Body:        message.Body,
+		Attachments: make([]Attachment, 0),
+	}}
 	for i := 0; i < len(attachments); i++ {
 		att := attachments[i]
-		var attachment = make(map[string]interface{})
-		attachment["ID"] = fmt.Sprint(att.ID)
-		attachment["Filename"] = att.OriginalName
-		attachment["URL"] = protocol + server.config.HostURL + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass
-		attachmentsmap = append(attachmentsmap, attachment)
+		var attachment = Attachment{
+			ID:       att.ID,
+			Filename: att.OriginalName,
+			URL:      protocol + server.config.HostURL + "/smtp2/attachment/retrieve/" + fmt.Sprint(message.ID) + "/" + fmt.Sprint(att.ID) + "?pass=" + att.AttachmentPass,
+		}
+		attachmentsmap.Data.Attachments = append(attachmentsmap.Data.Attachments, attachment)
 	}
-	var m = make(map[string]interface{})
-	m["ID"] = fmt.Sprint(message.ID)
-	m["Title"] = message.Title
-	m["Receiver"] = message.ToEmail
-	m["Sender"] = message.FromEmail
-	m["Body"] = message.Body
-	m["Attachments"] = attachmentsmap
-	w.Header().Set("Content-Type", "application/json")
-	response, _ := json.Marshal(m)
-	helpers.Write(w, helpers.BytearrayToString(response), http.StatusOK)
+	WriteJSON(w, attachmentsmap, http.StatusOK)
 }
 
 func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) {
 	isAuth, username, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	} else if isAuth == false {
-		helpers.Write(w, "Not authenticated", http.StatusForbidden)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 	server.logger.Info(username)
@@ -125,27 +119,19 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 	if server.config.HTTPSEnabled {
 		protocol = "https://"
 	}
-	var m []map[string]string
+	var m = InboxDataResponse{Data: make([]MessageData, 0)}
 	for i := 0; i < len(inbox); i++ {
-		var m1 = make(map[string]string)
-		var msg sql.ReceivedMessage = inbox[i]
-		m1["URI"] = protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID)
-		m1["To"] = msg.ToEmail
-		m1["From"] = msg.FromEmail
-		m1["Title"] = msg.Title
-		m1["ID"] = fmt.Sprint(msg.ID)
-
-		m = append(m, m1)
+		msg := inbox[i]
+		var m1 = MessageData{
+			ID:       msg.ID,
+			URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID),
+			Receiver: msg.ToEmail,
+			Sender:   msg.FromEmail,
+			Title:    msg.Title,
+		}
+		m.Data = append(m.Data, m1)
 	}
-	if m == nil {
-		m = make([]map[string]string, 0)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	response, _ := json.Marshal(m)
-	_, err = helpers.Write(w, helpers.BytearrayToString(response), http.StatusOK)
-	if err != nil {
-		return
-	}
+	WriteJSON(w, m, http.StatusOK)
 }
 
 func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
@@ -155,34 +141,29 @@ func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("ID")
 	idint, err := strconv.Atoi(id)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to convert ID to integer", Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
-		return
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 	}
 
 	originaldraft, err := server.db.GetSentMessage(idint)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve SentMessage from database", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	if originaldraft.FromEmail != from {
-		helpers.Write(w, "You don't have access to this resource.", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "You don't have access to this resource.", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	basemsg, err := server.db.GetOriginalMessageFromOriginalID(idint)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve base draft message from database", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve base draft message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if !basemsg.IsDraft {
@@ -194,95 +175,88 @@ func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 
 	err = server.db.UpdateDraftSentMessage(sentmsg)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false, Data: "[FATAL] Failed to update draft message"}, http.StatusInternalServerError)
 		return
 	}
-	helpers.Write(w, "OK - Updated successfully!", http.StatusOK)
+	WriteJSON(w, Response{Data: "OK - Updated successfully!", Success: true}, http.StatusOK)
 }
 
 func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		helpers.Write(w, "Not a valid integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Not a valid integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 
 	ok, from, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		helpers.Write(w, "Forbidden", http.StatusForbidden)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 
 	message, err := server.db.GetSentMessage(id)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve Sent message from database", http.StatusNotFound)
+		WriteJSON(w, Response{Data: "Failed to retrieve Sent message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
 
 	if message.FromEmail != from {
-		helpers.Write(w, "You don't have permission to delete this message", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "You don't have permission to delete this message", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	server.db.DeleteSentMessage(id)
 	server.db.DeleteMessage(id)
 
-	helpers.Write(w, "OK", http.StatusOK)
+	WriteJSON(w, Response{Data: "OK", Success: true}, http.StatusOK)
 }
 
 func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r *http.Request) {
 	isAuth, username, err := crypto2.CheckUser(r)
-	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
-		return
-	} else if isAuth == false {
-		helpers.Write(w, "Not authenticated", http.StatusForbidden)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
 		return
 	}
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		helpers.Write(w, "Not a valid integer", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Not a valid integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
 	}
 	msg, err := server.db.GetReceivedMessage(id)
 	if err != nil {
-		helpers.Write(w, "Failed to retrieve message from database", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	if msg.ToEmail != username {
-		helpers.Write(w, "This message wasn't intended for you!", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "This message wasn't intended for you!", Success: false}, http.StatusForbidden)
 		return
 	}
 	resp, err := http.Get(msg.URI)
 	if err != nil {
-		helpers.Write(w, "Failed to make a request", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		helpers.Write(w, "Failed to read response body", http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 	bodystring := helpers.BytearrayToString(body)
 	if resp.StatusCode != http.StatusOK {
-		helpers.Write(w, bodystring, resp.StatusCode)
+		WriteJSON(w, Response{Data: bodystring, Success: false}, resp.StatusCode)
 		return
 	}
 
 	// Let's manipulate string to hide URLs to attachments
-	// TLDR: Some advanced manipulation
+	// TLDR: Some -advanced- HIGH TECH manipulation
 	var j MessagePayload
 	err = json.Unmarshal(body, &j)
 	if err != nil {
-		fmt.Println(err)
-		helpers.Write(w, "Failed to unmarshal request data", http.StatusInternalServerError)
+		server.logger.Debug(err)
+		WriteJSON(w, Response{Data: "Failed to unmarshal request data", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	var attachments = make([]map[string]string, 0)
+	var attachments = make([]Attachment, 0)
 	var att = j.Attachments
 	for i := 0; i < len(att); i++ {
 		attachment := att[i]
@@ -290,15 +264,10 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		if server.config.HTTPSEnabled {
 			protocol = "https://"
 		}
-		url := protocol + server.config.HostURL + "/smtp2/attachment/remote/get/" + fmt.Sprint(id) + "/" + attachment["ID"]
-		attachment["URL"] = url
+		url := protocol + server.config.HostURL + "/smtp2/attachment/remote/get/" + fmt.Sprint(id) + "/" + fmt.Sprint(attachment.ID)
+		attachment.URL = url
 		attachments = append(attachments, attachment)
 	}
 	j.Attachments = attachments
-	marshal, err := json.Marshal(j)
-	if err != nil {
-		helpers.Write(w, "Failed to marshal response", http.StatusInternalServerError)
-		return
-	}
-	helpers.Write(w, helpers.BytearrayToString(marshal), http.StatusOK)
+	WriteJSON(w, j, http.StatusOK)
 }
