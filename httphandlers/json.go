@@ -5,13 +5,17 @@ import (
 	"net/http"
 )
 
-type MessagePayload struct {
-	ID          string       `json:"ID"`
+type MessageDataPayload struct {
+	ID          int          `json:"ID"`
 	Title       string       `json:"Title"`
 	Receiver    string       `json:"Receiver"`
 	Sender      string       `json:"Sender"`
 	Body        string       `json:"Body"`
 	Attachments []Attachment `json:"Attachments"`
+}
+
+type MessagePayload struct {
+	Data MessageDataPayload `json:"data"`
 }
 
 type ServerInfo struct {
@@ -70,7 +74,7 @@ type ReceivedMessageData struct {
 
 type ReceivedMessageResponse struct {
 	Response
-	Data ReceivedMessageData `json:"body"`
+	Data ReceivedMessageData `json:"data"`
 }
 
 type Attachment struct {

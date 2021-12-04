@@ -246,6 +246,7 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		WriteJSON(w, Response{Data: bodystring, Success: false}, resp.StatusCode)
 		return
 	}
+	server.logger.Debug(bodystring)
 
 	// Let's manipulate string to hide URLs to attachments
 	// TLDR: Some -advanced- HIGH TECH manipulation
@@ -257,7 +258,7 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		return
 	}
 	var attachments = make([]Attachment, 0)
-	var att = j.Attachments
+	var att = j.Data.Attachments
 	for i := 0; i < len(att); i++ {
 		attachment := att[i]
 		protocol := "http://"
@@ -268,6 +269,6 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		attachment.URL = url
 		attachments = append(attachments, attachment)
 	}
-	j.Attachments = attachments
+	j.Data.Attachments = attachments
 	WriteJSON(w, j, http.StatusOK)
 }

@@ -105,7 +105,7 @@ func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	WriteJSON(w, Response{Data: handler.Filename + " has been successfully uploaded", Success: true}, http.StatusCreated)
+	WriteJSON(w, Response{Data: lastattachmentid, Success: true}, http.StatusCreated)
 }
 
 func (server *httpImpl) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
@@ -335,7 +335,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 	}
 
 	aid := mux.Vars(r)["aid"]
-	_, err = strconv.Atoi(aid)
+	aidint, err := strconv.Atoi(aid)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Attachment ID isn't a proper integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
 		return
@@ -373,12 +373,12 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		WriteJSON(w, Response{Data: "Failed to unmarshal response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	var attachments = j.Attachments
+	var attachments = j.Data.Attachments
 	var url = ""
 	for i := 0; i < len(attachments); i++ {
 		attachment := attachments[i]
-		if attachment["ID"] == aid {
-			url = attachment["URL"]
+		if attachment.ID == aidint {
+			url = attachment.URL
 		}
 	}
 	if url == "" {
