@@ -16,30 +16,34 @@ func (server *httpImpl) Login(w http.ResponseWriter, r *http.Request) {
 	err := server.db.GetDB().Get(&user, "SELECT * FROM users WHERE email=$1", email)
 	hashCorrect := crypto2.CheckHash(pass, user.Password)
 	if !hashCorrect {
-		helpers.Write(w, "Hashes don't match...", http.StatusForbidden)
+		WriteJSON(w, Response{Data: "Hashes don't match...", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	// Extract JWT
 	jwt, err := crypto2.GetJWTFromUserPass(email, user.Password)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
-	helpers.Write(w, jwt, http.StatusOK)
+	WriteJSON(w, Response{Data: jwt, Success: true}, http.StatusOK)
 }
 
 func (server *httpImpl) NewUser(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("Email")
 	pass := r.FormValue("Pass")
 	if email == "" || pass == "" {
-		helpers.Write(w, "Bad Request. A parameter isn't provided", http.StatusBadRequest)
+		WriteJSON(w, Response{Data: "Bad Request. A parameter isn't provided", Success: false}, http.StatusBadRequest)
 		return
 	}
-	_, err := helpers.GetDomainFromEmail(email)
+	domain, err := helpers.GetDomainFromEmail(email)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusBadRequest)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to extract domain from email", Success: false}, http.StatusBadRequest)
+		return
+	}
+	if server.config.HostURL != domain {
+		WriteJSON(w, Response{Data: "This server doesn't host your domain", Success: false}, http.StatusForbidden)
 		return
 	}
 	// Check if user is already in DB
@@ -51,25 +55,25 @@ func (server *httpImpl) NewUser(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "sql: no rows in result set" {
 			userCreated = false
 		} else {
-			helpers.Write(w, err.Error(), http.StatusInternalServerError)
+			WriteJSON(w, Response{Error: err.Error(), Data: "Could not retrieve user from database", Success: false}, http.StatusInternalServerError)
 			return
 		}
 	}
 	if userCreated == true {
-		helpers.Write(w, "User is already in database", http.StatusUnprocessableEntity)
+		WriteJSON(w, Response{Data: "User is already in database", Success: false}, http.StatusUnprocessableEntity)
 		return
 	}
 
 	password, err := crypto2.HashPassword(pass)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to hash your password", Success: false}, http.StatusInternalServerError)
 		return
 	}
 
 	err = server.db.NewUser(email, password)
 	if err != nil {
-		helpers.Write(w, err.Error(), http.StatusInternalServerError)
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit new user to database", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	helpers.Write(w, "Success", http.StatusCreated)
+	WriteJSON(w, Response{Data: "Success", Success: true}, http.StatusCreated)
 }
