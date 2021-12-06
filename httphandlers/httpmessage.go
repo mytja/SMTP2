@@ -250,7 +250,7 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 
 	// Let's manipulate string to hide URLs to attachments
 	// TLDR: Some -advanced- HIGH TECH manipulation
-	var j MessagePayload
+	var j ReceivedMessageResponse
 	err = json.Unmarshal(body, &j)
 	if err != nil {
 		server.logger.Debug(err)
