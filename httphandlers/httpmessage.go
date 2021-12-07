@@ -12,40 +12,6 @@ import (
 	"strconv"
 )
 
-func (server *httpImpl) GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request) {
-	isAuth, email, err := crypto2.CheckUser(r)
-	if err != nil || !isAuth {
-		WriteForbiddenJWT(w, err)
-		return
-	}
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to convert ID to integer", Success: false}, http.StatusBadRequest)
-		return
-	}
-	message, err := server.db.GetReceivedMessage(id)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Message doesn't exist or internal server error: ", Error: err.Error(), Success: false}, http.StatusNotFound)
-		return
-	}
-	if message.ToEmail != email {
-		WriteJSON(w, Response{Data: "You aren't the recipient of following message", Success: false}, http.StatusForbidden)
-		return
-	}
-	protocol := "http://"
-	if server.config.HTTPSEnabled {
-		protocol = "https://"
-	}
-	WriteJSON(w, MessageDataResponse{Data: MessageData{
-		ID:       message.ID,
-		ServerID: message.ServerID,
-		Title:    message.Title,
-		URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(message.ID),
-		Receiver: message.ToEmail,
-		Sender:   message.FromEmail,
-	}}, http.StatusOK)
-}
-
 func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	pass := r.URL.Query().Get("pass")

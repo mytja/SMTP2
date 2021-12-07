@@ -22,7 +22,6 @@ type HTTP interface {
 	RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request)
 
 	// httpmessage.go
-	GetReceivedMessageHandler(w http.ResponseWriter, r *http.Request)
 	GetSentMessageHandler(w http.ResponseWriter, r *http.Request)
 	GetInboxHandler(w http.ResponseWriter, r *http.Request)
 	UpdateMessage(w http.ResponseWriter, r *http.Request)

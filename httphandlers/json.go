@@ -69,7 +69,7 @@ type ReceivedMessageData struct {
 	Receiver    string       `json:"Receiver"`
 	Sender      string       `json:"Sender"`
 	Attachments []Attachment `json:"Attachments"`
-	Body        string       `json:"body"`
+	Body        string       `json:"Body"`
 }
 
 type ReceivedMessageResponse struct {
