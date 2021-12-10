@@ -2,10 +2,29 @@ package sql
 
 import (
 	"errors"
-	"github.com/mytja/SMTP2/objects"
 )
 
-// TODO: Popravi vse pointerje k jih funkcije returnajo pa jih ne rabmo. (kje?)
+type Message struct {
+	ID         int
+	OriginalID int    `db:"original_id"`
+	ServerID   int    `db:"server_id"`
+	ReplyPass  string `db:"reply_pass"`
+	ReplyID    string `db:"reply_id"`
+	Type       string
+	IsDraft    bool `db:"is_draft"`
+}
+
+func NewMessage(ID int, OriginalID int, ServerID int, ReplyPass string, ReplyID string, Type string, IsDraft bool) Message {
+	return Message{
+		ID:         ID,
+		OriginalID: OriginalID,
+		ServerID:   ServerID,
+		ReplyPass:  ReplyPass,
+		ReplyID:    ReplyID,
+		Type:       Type,
+		IsDraft:    IsDraft,
+	}
+}
 
 func (db *sqlImpl) GetLastMessageID() int {
 	var id int
@@ -20,7 +39,7 @@ func (db *sqlImpl) GetLastMessageID() int {
 	return id + 1
 }
 
-func (db *sqlImpl) CommitMessage(msg objects.Message) error {
+func (db *sqlImpl) CommitMessage(msg Message) error {
 	_, err := db.tx.NamedExec(
 		"INSERT INTO messages (id, original_id, server_id, reply_pass, reply_id, type, is_draft) VALUES (:id, :original_id, :server_id, :reply_pass, :reply_id, :type, :is_draft)",
 		msg)
@@ -35,8 +54,8 @@ func (db *sqlImpl) CommitMessage(msg objects.Message) error {
 }
 
 // Tukaj se dogaja hokus pokus, bog ne daj, za kaj sem to naredil...
-func (db *sqlImpl) GetOriginalMessageFromReplyTo(ReplyTo int) (*objects.Message, error) {
-	var message objects.Message
+func (db *sqlImpl) GetOriginalMessageFromReplyTo(ReplyTo int) (*Message, error) {
+	var message Message
 	err := db.db.Get(&message, "SELECT * FROM messages WHERE id=$1", ReplyTo)
 	if err != nil {
 		return nil, err
@@ -55,8 +74,8 @@ func (db *sqlImpl) GetOriginalMessageFromReplyTo(ReplyTo int) (*objects.Message,
 	}
 }
 
-func (db *sqlImpl) GetOriginalMessageFromOriginalID(OriginalID int) (*objects.Message, error) {
-	var message objects.Message
+func (db *sqlImpl) GetOriginalMessageFromOriginalID(OriginalID int) (*Message, error) {
+	var message Message
 	err := db.db.Get(&message, "SELECT * FROM messages WHERE id=$1", OriginalID)
 	if err != nil {
 		return nil, err
@@ -68,14 +87,14 @@ func (db *sqlImpl) GetOriginalMessageFromOriginalID(OriginalID int) (*objects.Me
 	}
 }
 
-func (db *sqlImpl) GetMessageFromReplyTo(ReplyTo int) (*objects.Message, error) {
-	var message objects.Message
+func (db *sqlImpl) GetMessageFromReplyTo(ReplyTo int) (*Message, error) {
+	var message Message
 	err := db.db.Get(&message, "SELECT * FROM messages WHERE id=$1", ReplyTo)
 	return &message, err
 }
 
-func (db *sqlImpl) GetOriginalFromReplyHeaders(ReplyID string, ReplyPass string) (objects.Message, error) {
-	var message objects.Message
+func (db *sqlImpl) GetOriginalFromReplyHeaders(ReplyID string, ReplyPass string) (Message, error) {
+	var message Message
 	err := db.db.Get(
 		&message,
 		"SELECT * FROM messages WHERE (original_id=$1 AND reply_id=$2 AND reply_pass=$3)",
@@ -91,8 +110,8 @@ func (db *sqlImpl) DeleteMessage(ID int) error {
 	return err
 }
 
-func (db *sqlImpl) IsMessageInDatabase(mID int) (bool, *objects.Message, error) {
-	var message objects.Message
+func (db *sqlImpl) IsMessageInDatabase(mID int) (bool, *Message, error) {
+	var message Message
 	err := db.db.Get(&message, "SELECT * FROM messages WHERE id=$1", mID)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {

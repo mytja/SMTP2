@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/security"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io"
 	"io/ioutil"
@@ -30,7 +29,7 @@ func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -123,7 +122,7 @@ func (server *httpImpl) DeleteAttachment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -177,7 +176,7 @@ func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -321,7 +320,7 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 
 func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter, r *http.Request) {
 	skipav := r.URL.Query().Get("skipav")
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return

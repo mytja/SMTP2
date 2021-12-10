@@ -1,7 +1,5 @@
 package sql
 
-import "github.com/mytja/SMTP2/objects"
-
 func NewDraftSentMessage(id int, title string, to string, from string, body string) SentMessage {
 	return SentMessage{
 		ID:        id,
@@ -13,8 +11,8 @@ func NewDraftSentMessage(id int, title string, to string, from string, body stri
 	}
 }
 
-func NewDraftMessage(id int, originalID int, replypass string, replyid string) objects.Message {
-	return objects.Message{
+func NewDraftMessage(id int, originalID int, replypass string, replyid string) Message {
+	return Message{
 		ID:         id,
 		OriginalID: originalID,
 		ServerID:   -1,
@@ -33,7 +31,7 @@ func (db *sqlImpl) UpdateDraftSentMessage(draft SentMessage) error {
 	return err
 }
 
-func (db *sqlImpl) UpdateDraftMessage(draft objects.Message) error {
+func (db *sqlImpl) UpdateDraftMessage(draft Message) error {
 	_, err := db.db.NamedExec(
 		`UPDATE messages SET original_id=:original_id, server_id=:server_id, reply_pass=:reply_pass, reply_id=:reply_id, is_draft=:is_draft WHERE id=:id`,
 		draft,

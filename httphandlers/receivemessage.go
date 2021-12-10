@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/jpillora/go-tld"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/objects"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
@@ -84,7 +83,7 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 	msgid := server.db.GetLastMessageID()
-	basemsg := objects.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received", false)
+	basemsg := sql.NewMessage(msgid, originalidint, atoi, replypass, replyid, "received", false)
 
 	msg := sql.NewReceivedMessage(msgid, title, uri, to, from, atoi, pass, "", mvppass)
 

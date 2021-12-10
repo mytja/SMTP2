@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io/ioutil"
 	"net/http"
@@ -70,7 +69,7 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) {
-	isAuth, username, err := crypto2.CheckUser(r)
+	isAuth, username, err := server.security.CheckUser(r)
 	if err != nil || !isAuth {
 		WriteForbiddenJWT(w, err)
 		return
@@ -111,7 +110,7 @@ func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 	}
@@ -154,7 +153,7 @@ func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -178,7 +177,7 @@ func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r *http.Request) {
-	isAuth, username, err := crypto2.CheckUser(r)
+	isAuth, username, err := server.security.CheckUser(r)
 	if err != nil || !isAuth {
 		WriteForbiddenJWT(w, err)
 		return

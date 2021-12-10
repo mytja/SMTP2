@@ -4,7 +4,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mytja/SMTP2/objects"
 	"go.uber.org/zap"
 )
 
@@ -23,20 +22,20 @@ type SQL interface {
 	GetInbox(string) ([]ReceivedMessage, error)
 	GenerateNewTransaction()
 	NewUser(string, string) error
-	GetUserByEmail(string) (objects.User, error)
+	GetUserByEmail(string) (User, error)
 	Commit() error
 	CommitSentMessage(SentMessage) error
 	GetSentMessage(int) (*SentMessage, error)
 	GetLastMessageID() int
-	CommitMessage(message objects.Message) error
-	GetOriginalMessageFromOriginalID(int) (*objects.Message, error)
-	GetOriginalMessageFromReplyTo(int) (*objects.Message, error)
-	GetMessageFromReplyTo(int) (*objects.Message, error)
-	GetOriginalFromReplyHeaders(string, string) (objects.Message, error)
+	CommitMessage(message Message) error
+	GetOriginalMessageFromOriginalID(int) (*Message, error)
+	GetOriginalMessageFromReplyTo(int) (*Message, error)
+	GetMessageFromReplyTo(int) (*Message, error)
+	GetOriginalFromReplyHeaders(string, string) (Message, error)
 	DeleteMessage(int) error
 	DeleteSentMessage(int) error
 	UpdateDraftSentMessage(SentMessage) error
-	UpdateDraftMessage(objects.Message) error
+	UpdateDraftMessage(Message) error
 	CommitAttachment(Attachment) error
 	GetLastAttachmentID() int
 	GetAttachment(int, int) (*Attachment, error)

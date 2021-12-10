@@ -2,15 +2,17 @@ package httphandlers
 
 import (
 	"github.com/mytja/SMTP2/helpers"
+	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
 	"go.uber.org/zap"
 	"net/http"
 )
 
 type httpImpl struct {
-	logger *zap.SugaredLogger
-	db     sql.SQL
-	config helpers.ServerConfig
+	logger   *zap.SugaredLogger
+	db       sql.SQL
+	config   helpers.ServerConfig
+	security security.Security
 }
 
 type HTTP interface {
@@ -52,8 +54,9 @@ type HTTP interface {
 
 func NewHTTPInterface(logger *zap.SugaredLogger, db sql.SQL, config helpers.ServerConfig) HTTP {
 	return &httpImpl{
-		logger: logger,
-		db:     db,
-		config: config,
+		logger:   logger,
+		db:       db,
+		config:   config,
+		security: security.NewSecurity(db),
 	}
 }

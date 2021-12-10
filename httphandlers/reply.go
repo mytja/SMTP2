@@ -6,9 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
-	"github.com/mytja/SMTP2/objects"
 	"github.com/mytja/SMTP2/security"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io/ioutil"
 	"net/http"
@@ -20,7 +18,7 @@ import (
 func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -102,7 +100,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	id := server.db.GetLastMessageID()
-	basemsg := objects.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
+	basemsg := sql.NewMessage(id, originalid, -1, replytomsg.ReplyPass, replytomsg.ReplyID, "sent", false)
 	err = server.db.CommitMessage(basemsg)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed while committing message base", Error: err.Error(), Success: false}, http.StatusInternalServerError)

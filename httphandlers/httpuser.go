@@ -2,7 +2,7 @@ package httphandlers
 
 import (
 	"github.com/mytja/SMTP2/helpers"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
+	"github.com/mytja/SMTP2/security"
 	"net/http"
 )
 
@@ -11,14 +11,14 @@ func (server *httpImpl) Login(w http.ResponseWriter, r *http.Request) {
 	pass := r.FormValue("Pass")
 	// Check if password is valid
 	user, err := server.db.GetUserByEmail(email)
-	hashCorrect := crypto2.CheckHash(pass, user.Password)
+	hashCorrect := security.CheckHash(pass, user.Password)
 	if !hashCorrect {
 		WriteJSON(w, Response{Data: "Hashes don't match...", Success: false}, http.StatusForbidden)
 		return
 	}
 
 	// Extract JWT
-	jwt, err := crypto2.GetJWTFromUserPass(email, user.Password)
+	jwt, err := security.GetJWTFromUserPass(email)
 	if err != nil {
 		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
@@ -59,7 +59,7 @@ func (server *httpImpl) NewUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	password, err := crypto2.HashPassword(pass)
+	password, err := security.HashPassword(pass)
 	if err != nil {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to hash your password", Success: false}, http.StatusInternalServerError)
 		return

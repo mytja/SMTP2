@@ -1,21 +1,19 @@
 package httphandlers
 
 import (
-	"github.com/mytja/SMTP2/objects"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"strconv"
 )
 
 func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
 	}
 
-	var originalmessage *objects.Message
+	var originalmessage *sql.Message
 	var replyid = ""
 	var replypass = ""
 	var originalid = -1

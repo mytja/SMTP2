@@ -1,17 +1,28 @@
-package crypto
+package security
 
 import (
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt"
 	"github.com/mytja/SMTP2/helpers/constants"
+	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"time"
 )
 
-func GetJWTFromUserPass(email string, pass string) (string, error) {
-	// IMPORTANT: Password MUST BE hashed
+type securityImpl struct {
+	db sql.SQL
+}
 
+type Security interface {
+	CheckUser(r *http.Request) (bool, string, error)
+}
+
+func NewSecurity(db sql.SQL) Security {
+	return &securityImpl{db: db}
+}
+
+func GetJWTFromUserPass(email string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -20,10 +31,7 @@ func GetJWTFromUserPass(email string, pass string) (string, error) {
 		"exp":   expirationTime.Unix(),
 	})
 
-	// Sign and get the complete encoded token as a string using the secret
-	tokenString, err := token.SignedString(constants.JwtSigningKey)
-
-	return tokenString, err
+	return token.SignedString(constants.JwtSigningKey)
 }
 
 func CheckJWT(tokenString string) (jwt.MapClaims, error) {
@@ -47,7 +55,7 @@ func CheckJWT(tokenString string) (jwt.MapClaims, error) {
 	}
 }
 
-func CheckUser(r *http.Request) (bool, string, error) {
+func (s *securityImpl) CheckUser(r *http.Request) (bool, string, error) {
 	token := r.Header.Get("X-Login-Token")
 	if token == "" {
 		return false, "", errors.New(constants.ERR_NOJWTPROVIDED)
@@ -57,5 +65,12 @@ func CheckUser(r *http.Request) (bool, string, error) {
 		return false, "", err
 	}
 	email := fmt.Sprint(j["email"])
+	user, err := s.db.GetUserByEmail(email)
+	if err != nil {
+		return false, "", err
+	}
+	if email != user.Email {
+		return false, "", errors.New("no user with this email was located in database")
+	}
 	return true, email, nil
 }

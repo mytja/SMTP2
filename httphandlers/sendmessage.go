@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
-	"github.com/mytja/SMTP2/objects"
 	"github.com/mytja/SMTP2/security"
-	crypto2 "github.com/mytja/SMTP2/security/crypto"
 	"github.com/mytja/SMTP2/sql"
 	"io/ioutil"
 	"net/http"
@@ -21,7 +19,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	body := r.FormValue("Body")
 	usedraft := r.FormValue("DraftID")
 
-	ok, from, err := crypto2.CheckUser(r)
+	ok, from, err := server.security.CheckUser(r)
 	if err != nil || !ok {
 		WriteForbiddenJWT(w, err)
 		return
@@ -152,7 +150,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			protocol = "https://"
 		}
 
-		basemsg := objects.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
+		basemsg := sql.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
 		err = server.db.CommitMessage(basemsg)
 		if err != nil {
 			result["Body"] = "Error while committing base Message to database."
