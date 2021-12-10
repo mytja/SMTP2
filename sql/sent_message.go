@@ -14,7 +14,7 @@ func (db *sqlImpl) GetSentMessage(id int) (*SentMessage, error) {
 	var message SentMessage
 
 	err := db.db.Get(&message, "SELECT * FROM sentmsgs WHERE id=$1", id)
-	//fmt.Println("MSGGETID:", message.ID)
+	//server.logger.Info("MSGGETID:", message.ID)
 	if err != nil {
 		return nil, err
 	}

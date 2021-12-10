@@ -96,7 +96,7 @@ func main() {
 	sugared := logger.Sugar()
 	sugared.Infow("using following database", "driver", config.DBDriver, "config", config.DBConfig)
 
-	db, err := sql.NewSQL(config.DBDriver, config.DBConfig)
+	db, err := sql.NewSQL(config.DBDriver, config.DBConfig, sugared)
 	db.Init()
 
 	if err != nil {

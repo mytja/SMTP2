@@ -230,7 +230,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
-			fmt.Println(err)
+			server.logger.Info(err)
 			result["Body"] = "Remote server isn't available at the moment. Failed to send message."
 			result["To"] = to
 			result["StatusCode"] = -1

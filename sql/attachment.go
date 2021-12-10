@@ -1,7 +1,5 @@
 package sql
 
-import "fmt"
-
 type Attachment struct {
 	ID             int
 	MessageID      int    `db:"message_id"`
@@ -41,7 +39,7 @@ func (db *sqlImpl) GetLastAttachmentID() int {
 		if err.Error() == "sql: no rows in result set" {
 			return 0
 		}
-		fmt.Println(err)
+		db.logger.Info(err)
 		return -1
 	}
 	return id + 1

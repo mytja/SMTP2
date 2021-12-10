@@ -5,12 +5,14 @@ import (
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mytja/SMTP2/objects"
+	"go.uber.org/zap"
 )
 
 type sqlImpl struct {
-	db  *sqlx.DB
-	tx  *sqlx.Tx
-	err error
+	db     *sqlx.DB
+	tx     *sqlx.Tx
+	err    error
+	logger *zap.SugaredLogger
 }
 
 type SQL interface {
@@ -42,12 +44,13 @@ type SQL interface {
 	GetAllAttachments(int) ([]Attachment, error)
 }
 
-func NewSQL(driver string, drivername string) (SQL, error) {
+func NewSQL(driver string, drivername string, logger *zap.SugaredLogger) (SQL, error) {
 	db, err := sqlx.Connect(driver, drivername)
 	tx := db.MustBegin()
 	return &sqlImpl{
-		db:  db,
-		tx:  tx,
-		err: err,
+		db:     db,
+		tx:     tx,
+		err:    err,
+		logger: logger,
 	}, err
 }

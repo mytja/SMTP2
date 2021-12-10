@@ -1,9 +1,5 @@
 package sql
 
-import (
-	"fmt"
-)
-
 type ReceivedMessage struct {
 	ID         int
 	Title      string
@@ -36,8 +32,8 @@ func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Received new email")
-	fmt.Println(res)
+	db.logger.Info("Received new email")
+	db.logger.Info(res)
 	return nil
 }
 

@@ -2,7 +2,6 @@ package sql
 
 import (
 	"errors"
-	"fmt"
 	"github.com/mytja/SMTP2/objects"
 )
 
@@ -15,7 +14,7 @@ func (db *sqlImpl) GetLastMessageID() int {
 		if err.Error() == "sql: no rows in result set" {
 			return 0
 		}
-		fmt.Println(err)
+		db.logger.Info(err)
 		return -1
 	}
 	return id + 1

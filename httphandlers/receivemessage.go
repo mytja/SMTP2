@@ -88,7 +88,7 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 
 	msg := sql.NewReceivedMessage(msgid, title, uri, to, from, atoi, pass, "", mvppass)
 
-	verification, err := security.VerifyMessage(msg)
+	verification, err := security.VerifyMessage(msg, server.logger)
 	if !verification {
 		server.logger.Infow("failed to verify", "error", err)
 		WriteJSON(w, Response{Data: "Failed to verify message.", Success: false}, http.StatusForbidden)

@@ -404,7 +404,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 	if skipav != "1" {
 		// Here goes AV analysis
 		var analysisresult AttachmentAnalysis
-		fmt.Println(server.config.AV_URL)
+		server.logger.Info(server.config.AV_URL)
 		avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
 		if err != nil {
 			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
