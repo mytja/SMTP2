@@ -73,7 +73,6 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		body = message.Body
 		to = message.ToEmail
 	}
-
 	if !strings.Contains(to, "@") {
 		WriteJSON(w, Response{Data: "Invalid To address", Success: false}, http.StatusBadRequest)
 		return

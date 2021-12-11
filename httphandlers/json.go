@@ -50,6 +50,7 @@ type MessageData struct {
 	URI      string `json:"URI"`
 	Receiver string `json:"Receiver"`
 	Sender   string `json:"Sender"`
+	IsRead   bool   `json:"IsRead"`
 }
 
 type MessageDataResponse struct {

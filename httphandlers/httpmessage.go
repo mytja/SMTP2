@@ -93,6 +93,7 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 			Receiver: msg.ToEmail,
 			Sender:   msg.FromEmail,
 			Title:    msg.Title,
+			IsRead:   msg.IsRead,
 		}
 		m.Data = append(m.Data, m1)
 	}
@@ -235,5 +236,39 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		attachments = append(attachments, attachment)
 	}
 	j.Data.Attachments = attachments
+
+	// We don't handle error, as it's not as important to mark as read message
+	msg.IsRead = true
+	err = server.db.UpdateReceivedMessage(*msg)
+	server.logger.Debug(err)
+
 	WriteJSON(w, j, http.StatusOK)
+}
+
+func (server *httpImpl) MarkReadUnread(w http.ResponseWriter, r *http.Request) {
+	isAuth, username, err := server.security.CheckUser(r)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		WriteJSON(w, Response{Data: "Not a valid integer", Error: err.Error(), Success: false}, http.StatusBadRequest)
+		return
+	}
+	msg, err := server.db.GetReceivedMessage(id)
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to retrieve message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		return
+	}
+	if msg.ToEmail != username {
+		WriteJSON(w, Response{Data: "This message wasn't intended for you!", Success: false}, http.StatusForbidden)
+		return
+	}
+	msg.IsRead = !msg.IsRead
+	err = server.db.UpdateReceivedMessage(*msg)
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to mark as read/unread", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		return
+	}
 }

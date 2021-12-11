@@ -10,6 +10,7 @@ type ReceivedMessage struct {
 	ServerPass string `db:"server_pass"` // This is password used to access this email from server
 	Warning    string
 	MVPPass    string `db:"mvp_pass"`
+	IsRead     bool   `db:"is_read"`
 }
 
 func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
@@ -23,7 +24,7 @@ func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
 
 func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	res, err := db.tx.NamedExec(
-		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning, mvp_pass) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning, :mvp_pass)",
+		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning, mvp_pass, is_read) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning, :mvp_pass, :is_read)",
 		msg)
 	if err != nil {
 		return err
@@ -35,6 +36,26 @@ func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	db.logger.Info("Received new email")
 	db.logger.Info(res)
 	return nil
+}
+
+func (db *sqlImpl) UpdateReceivedMessage(msg ReceivedMessage) error {
+	sql := `
+	UPDATE receivedmsgs SET
+		title=:title,
+		uri=:uri,
+		to_email=:to_email,
+		from_email=:from_email,
+		server_id=:server_id,
+	    server_pass=:server_pass,
+	    warning=:warning,
+	    mvp_pass=:mvp_pass,
+	    is_read=:is_read WHERE id=:id
+	`
+	_, err := db.db.NamedExec(
+		sql,
+		msg,
+	)
+	return err
 }
 
 func NewReceivedMessage(
@@ -49,5 +70,6 @@ func NewReceivedMessage(
 		ServerPass: pass,
 		Warning:    warning,
 		MVPPass:    mvppass,
+		IsRead:     false,
 	}
 }

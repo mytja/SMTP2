@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/httphandlers"
 	"github.com/mytja/SMTP2/sql"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"net/http"
@@ -120,6 +120,7 @@ func main() {
 	r.HandleFunc("/smtp2/message/update", httphandler.UpdateMessage).Methods(httphandlers.PATCH)
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)
+	r.HandleFunc("/smtp2/message/mark/read/{id}", httphandler.MarkReadUnread).Methods(httphandlers.PATCH)
 	// Get message from sender server (SentMessage) - recipient server -> sender server
 	r.HandleFunc("/smtp2/message/get/{id}", httphandler.GetSentMessageHandler).Methods(httphandlers.GET)
 	// Get message from remote server
@@ -147,9 +148,14 @@ func main() {
 	serve := config.Host + ":" + config.Port
 	sugared.Info("Serving on following URL: " + serve)
 
-	origins := handlers.AllowedOrigins([]string{"*"})
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"}, // All origins
+		AllowedHeaders: []string{"X-Login-Token"},
+		AllowedMethods: []string{httphandlers.POST, httphandlers.GET, httphandlers.DELETE, httphandlers.PATCH, httphandlers.PUT},
+		Debug:          false,
+	})
 
-	err = http.ListenAndServe(serve, handlers.CORS(origins)(r))
+	err = http.ListenAndServe(serve, c.Handler(r))
 	if err != nil {
 		sugared.Fatal(err.Error())
 	}

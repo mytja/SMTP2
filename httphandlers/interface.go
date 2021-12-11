@@ -29,6 +29,7 @@ type HTTP interface {
 	UpdateMessage(w http.ResponseWriter, r *http.Request)
 	DeleteMessage(w http.ResponseWriter, r *http.Request)
 	RetrieveMessageFromRemoteServer(w http.ResponseWriter, r *http.Request)
+	MarkReadUnread(w http.ResponseWriter, r *http.Request)
 
 	// sendmessage.go
 	NewMessageHandler(w http.ResponseWriter, r *http.Request)

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS receivedmsgs (
 	server_id    INTEGER       NOT NULL,
 	server_pass  VARCHAR(100)  NOT NULL,
 	mvp_pass     VARCHAR(100)  NOT NULL,
+	is_read      BOOLEAN       NOT NULL,
 	warning      VARCHAR(75)
 );
 CREATE TABLE IF NOT EXISTS messages (
