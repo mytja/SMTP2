@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
@@ -404,17 +405,13 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		// Here goes AV analysis
 		var analysisresult AttachmentAnalysis
 		server.logger.Info(server.config.AV_URL)
-		avreq, err := http.NewRequest("POST", server.config.AV_URL, att.Body)
+		file := req.FileUpload{File: att.Body, FieldName: "FILES"}
+		avreq, err := req.Post(server.config.AV_URL, file)
 		if err != nil {
 			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
-		avresp, err := http.DefaultClient.Do(avreq)
-		if err != nil {
-			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
-			return
-		}
-		avbody, err := ioutil.ReadAll(avresp.Body)
+		avbody, err := avreq.ToBytes()
 		if err != nil {
 			WriteJSON(w, Response{Data: "Failed to read response body from AV scan", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
