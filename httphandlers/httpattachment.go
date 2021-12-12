@@ -409,21 +409,25 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		var analysisresult AttachmentAnalysis
 		server.logger.Info(server.config.AV_URL)
 		file := req.FileUpload{File: io.NopCloser(tee), FieldName: "FILES"}
+		server.logger.Info("Created file")
 		avreq, err := req.Post(server.config.AV_URL, file)
 		if err != nil {
 			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
+		server.logger.Info("Made request")
 		avbody, err := avreq.ToBytes()
 		if err != nil {
 			WriteJSON(w, Response{Data: "Failed to read response body from AV scan", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
+		server.logger.Info("AV request dumped to bytes")
 		err = json.Unmarshal(avbody, &analysisresult)
 		if err != nil {
 			WriteJSON(w, Response{Data: "Failed to unmarshal AV response", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 			return
 		}
+		server.logger.Info("AV request unmarshaled")
 		if !analysisresult.Success {
 			WriteJSON(w, Response{Data: fmt.Sprint(string(avbody), " - ", analysisresult), Success: false, Error: "AV scan failed"}, http.StatusBadGateway)
 			return
@@ -432,6 +436,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 			WriteJSON(w, Response{Data: "This file is infected with malware", Error: analysisresult.Data.Result[0].Viruses[0], Success: false}, http.StatusInternalServerError)
 			return
 		}
+		server.logger.Info("AV request done", analysisresult)
 	}
 
 	_, err = io.Copy(w, pipeReader)
@@ -439,4 +444,5 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
+	server.logger.Info("Wrote to writer")
 }
