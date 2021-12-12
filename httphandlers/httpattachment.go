@@ -425,7 +425,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 			return
 		}
 		if !analysisresult.Success {
-			WriteJSON(w, Response{Data: "AV scan failed", Success: false, Error: "AV scan failed"}, http.StatusBadGateway)
+			WriteJSON(w, Response{Data: fmt.Sprint(string(avbody), " - ", analysisresult), Success: false, Error: "AV scan failed"}, http.StatusBadGateway)
 			return
 		}
 		if analysisresult.Data.Result[0].IsInfected {
