@@ -1,6 +1,7 @@
 package httphandlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -401,15 +402,15 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		return
 	}
 
-	pipeReader, pipeWriter := io.Pipe()
-	tee := io.TeeReader(att.Body, pipeWriter)
+	contents, _ := ioutil.ReadAll(att.Body)
 
 	if skipav != "1" {
 		// Here goes AV analysis
 		var analysisresult AttachmentAnalysis
 		server.logger.Info(server.config.AV_URL)
-		file := req.FileUpload{File: io.NopCloser(tee), FieldName: "FILES"}
+		file := req.FileUpload{File: ioutil.NopCloser(bytes.NewReader(contents)), FieldName: "FILES"}
 		server.logger.Info("Created file")
+		req.Debug = true
 		avreq, err := req.Post(server.config.AV_URL, file)
 		if err != nil {
 			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
@@ -439,7 +440,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		server.logger.Info("AV request done", analysisresult)
 	}
 
-	_, err = io.Copy(w, pipeReader)
+	_, err = io.Copy(w, ioutil.NopCloser(bytes.NewReader(contents)))
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
