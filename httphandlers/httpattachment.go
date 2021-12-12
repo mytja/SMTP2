@@ -401,11 +401,14 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		return
 	}
 
+	pipeReader, pipeWriter := io.Pipe()
+	tee := io.TeeReader(att.Body, pipeWriter)
+
 	if skipav != "1" {
 		// Here goes AV analysis
 		var analysisresult AttachmentAnalysis
 		server.logger.Info(server.config.AV_URL)
-		file := req.FileUpload{File: att.Body, FieldName: "FILES"}
+		file := req.FileUpload{File: io.NopCloser(tee), FieldName: "FILES"}
 		avreq, err := req.Post(server.config.AV_URL, file)
 		if err != nil {
 			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
@@ -431,7 +434,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		}
 	}
 
-	_, err = io.Copy(w, att.Body)
+	_, err = io.Copy(w, pipeReader)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
