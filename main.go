@@ -152,7 +152,7 @@ func main() {
 		AllowedOrigins: []string{"*"}, // All origins
 		AllowedHeaders: []string{"X-Login-Token"},
 		AllowedMethods: []string{httphandlers.POST, httphandlers.GET, httphandlers.DELETE, httphandlers.PATCH, httphandlers.PUT},
-		Debug:          false,
+		Debug:          config.Debug,
 	})
 
 	err = http.ListenAndServe(serve, c.Handler(r))
