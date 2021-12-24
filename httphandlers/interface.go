@@ -58,6 +58,6 @@ func NewHTTPInterface(logger *zap.SugaredLogger, db sql.SQL, config helpers.Serv
 		logger:   logger,
 		db:       db,
 		config:   config,
-		security: security.NewSecurity(db),
+		security: security.NewSecurity(db, logger),
 	}
 }

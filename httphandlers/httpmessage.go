@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/mytja/SMTP2/helpers"
+	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/sql"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -197,19 +196,16 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		WriteJSON(w, Response{Data: "This message wasn't intended for you!", Success: false}, http.StatusForbidden)
 		return
 	}
-	resp, err := http.Get(msg.URI)
+	resp, err := req.Get(msg.URI)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	bodystring := helpers.BytearrayToString(body)
-	if resp.StatusCode != http.StatusOK {
-		WriteJSON(w, Response{Data: bodystring, Success: false}, resp.StatusCode)
+	code := resp.Response().StatusCode
+	bodystring := resp.String()
+
+	if code != http.StatusOK {
+		WriteJSON(w, Response{Data: bodystring, Success: false}, code)
 		return
 	}
 	server.logger.Debug(bodystring)
@@ -217,7 +213,7 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 	// Let's manipulate string to hide URLs to attachments
 	// TLDR: Some -advanced- HIGH TECH manipulation
 	var j ReceivedMessageResponse
-	err = json.Unmarshal(body, &j)
+	err = json.Unmarshal(resp.Bytes(), &j)
 	if err != nil {
 		server.logger.Debug(err)
 		WriteJSON(w, Response{Data: "Failed to unmarshal request data", Error: err.Error(), Success: false}, http.StatusInternalServerError)

@@ -1,17 +1,29 @@
 package httphandlers
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 )
+
+type SentMessage struct {
+	Title      string `json:"Title"`
+	To         string `json:"To"`
+	From       string `json:"From"`
+	ServerPass string `json:"ServerPass"`
+	ReplyPass  string `json:"ReplyPass"`
+	ReplyID    string `json:"ReplyID"`
+	OriginalID string `json:"OriginalID"`
+	ServerID   string `json:"ServerID"`
+	MVPPass    string `json:"MVPPass"`
+	URI        string `json:"URI"`
+}
 
 func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
@@ -119,36 +131,15 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		resp, err := http.Get("http://" + todomain + "/smtp2/server/info")
+		protocol, err := server.security.GetProtocolFromDomain(todomain)
 		if err != nil {
-			result["Body"] = "Remote server isn't available at the moment. Failed to send message."
+			result["Body"] = "Remote server isn't available at the moment. Please try again later"
 			result["To"] = to
 			result["StatusCode"] = -1
+			result["Error"] = err.Error()
 			responseMap = append(responseMap, result)
 			break
 		}
-		reqbody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			result["Body"] = "Failed to read response body."
-			result["To"] = to
-			result["StatusCode"] = -1
-			responseMap = append(responseMap, result)
-			break
-		}
-		resjson := make(map[string]interface{})
-		err = json.Unmarshal(reqbody, &resjson)
-		if err != nil {
-			result["Body"] = "Failed to unmarshal server's response."
-			result["To"] = to
-			result["StatusCode"] = -1
-			responseMap = append(responseMap, result)
-			break
-		}
-		protocol := "http://"
-		if resjson["hasHTTPS"] == true {
-			protocol = "https://"
-		}
-
 		basemsg := sql.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
 		err = server.db.CommitMessage(basemsg)
 		if err != nil {
@@ -191,7 +182,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		// Now let's send a request to a recipient email server
 
 		idstring := fmt.Sprint(id)
-		server.logger.Infow("requesting to "+to, "basemsg", basemsg, "msg", msg, "todomain", todomain, "id", idstring)
+		server.logger.Debugw("requesting to "+to, "basemsg", basemsg, "msg", msg, "todomain", todomain, "id", idstring)
 
 		reqdom := protocol + todomain + "/smtp2/message/receive"
 
@@ -199,21 +190,6 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		if server.config.HTTPSEnabled {
 			urlprotocol = "https://"
 		}
-
-		req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
-		req.Header.Set("Title", msg.Title)
-		req.Header.Set("To", msg.ToEmail)
-		req.Header.Set("From", msg.FromEmail)
-		req.Header.Set("ServerPass", msg.Pass)
-		req.Header.Set("ReplyPass", basemsg.ReplyPass)
-		req.Header.Set("ReplyID", basemsg.ReplyID)
-		req.Header.Set("OriginalID", "-1")
-		req.Header.Set("ServerID", fmt.Sprint(idstring))
-		req.Header.Set("MVPPass", fmt.Sprint(mvppass))
-		req.Header.Set(
-			"URI",
-			urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+msg.Pass,
-		)
 
 		// We have to commit a message before we send a request
 		err = server.db.CommitSentMessage(msg)
@@ -225,28 +201,44 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			break
 		}
 
-		res, err := http.DefaultClient.Do(req)
+		mailurl := urlprotocol + server.config.HostURL + "/smtp2/message/get/" + fmt.Sprint(id) + "?pass=" + msg.Pass
+
+		headers := SentMessage{
+			Title:      msg.Title,
+			To:         msg.ToEmail,
+			From:       msg.FromEmail,
+			ServerPass: msg.Pass,
+			ReplyPass:  basemsg.ReplyPass,
+			ReplyID:    basemsg.ReplyID,
+			OriginalID: "-1",
+			ServerID:   idstring,
+			MVPPass:    mvppass,
+			URI:        mailurl,
+		}
+
+		res, err := req.Post(reqdom, req.HeaderFromStruct(headers))
 		if err != nil {
 			server.logger.Info(err)
 			result["Body"] = "Remote server isn't available at the moment. Failed to send message."
 			result["To"] = to
 			result["StatusCode"] = -1
+			result["Error"] = err.Error()
 			responseMap = append(responseMap, result)
 			break
 		}
 
-		server.logger.Infow("requesting to "+to, "mail_url", req.Header.Get("URI"), "domain", reqdom)
+		server.logger.Debugw("requesting to "+to, "mail_url", mailurl, "domain", reqdom)
 
-		body3, _ := ioutil.ReadAll(res.Body)
-		result["Body"] = helpers.BytearrayToString(body3)
+		code := res.Response().StatusCode
+
+		result["Body"] = res.String()
 		result["To"] = to
-		result["StatusCode"] = res.StatusCode
+		result["StatusCode"] = code
 		responseMap = append(responseMap, result)
 
-		server.logger.Info(helpers.BytearrayToString(body3))
-		if res.StatusCode == http.StatusCreated {
+		if code == http.StatusCreated {
 			// Mogoče dodaj tukaj kej
-		} else if res.StatusCode == http.StatusNotAcceptable || constants.EnableDeletingOnUnknownError {
+		} else if code == http.StatusNotAcceptable || constants.EnableDeletingOnUnknownError {
 			server.db.DeleteMessage(basemsg.ID)
 			server.db.DeleteSentMessage(msg.ID)
 		}

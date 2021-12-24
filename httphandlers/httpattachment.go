@@ -353,23 +353,20 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		return
 	}
 
-	resp, err := http.Get(message.URI)
+	resp, err := req.Get(message.URI)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	bodystring := helpers.BytearrayToString(body)
-	if resp.StatusCode != http.StatusOK {
-		WriteJSON(w, Response{Data: bodystring, Success: false}, resp.StatusCode)
+
+	bodystring := resp.String()
+	code := resp.Response().StatusCode
+	if code != http.StatusOK {
+		WriteJSON(w, Response{Data: bodystring, Success: false}, code)
 		return
 	}
 	var j MessagePayload
-	err = json.Unmarshal(body, &j)
+	err = json.Unmarshal(resp.Bytes(), &j)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to unmarshal response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
@@ -386,23 +383,18 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		WriteJSON(w, Response{Data: "Could not find attachment with following ID", Success: false}, http.StatusNotFound)
 		return
 	}
-	att, err := http.Get(url)
+	att, err := req.Get(url)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to make a request", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
-	if att.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			WriteJSON(w, Response{Data: "Failed to read response body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-			return
-		}
-		bodystring := helpers.BytearrayToString(body)
-		WriteJSON(w, Response{Error: bodystring, Success: false}, resp.StatusCode)
+	status := att.Response().StatusCode
+	if status != 200 {
+		WriteJSON(w, Response{Error: att.String(), Success: false}, status)
 		return
 	}
 
-	contents, _ := ioutil.ReadAll(att.Body)
+	contents := att.Bytes()
 
 	if skipav != "1" {
 		// Here goes AV analysis

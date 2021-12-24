@@ -6,20 +6,27 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/sql"
+	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
 
 type securityImpl struct {
-	db sql.SQL
+	db     sql.SQL
+	logger *zap.SugaredLogger
 }
 
 type Security interface {
 	CheckUser(r *http.Request) (bool, string, error)
+	GetProtocolFromDomain(todomain string) (string, error)
+
+	VerifyEmailServer(mail sql.ReceivedMessage) error
+	VerifyEmailSender(mail sql.ReceivedMessage) error
+	VerifyMessage(mail sql.ReceivedMessage) (bool, error)
 }
 
-func NewSecurity(db sql.SQL) Security {
-	return &securityImpl{db: db}
+func NewSecurity(db sql.SQL, logger *zap.SugaredLogger) Security {
+	return &securityImpl{db: db, logger: logger}
 }
 
 func GetJWTFromUserPass(email string) (string, error) {
@@ -55,7 +62,7 @@ func CheckJWT(tokenString string) (jwt.MapClaims, error) {
 	}
 }
 
-func (s *securityImpl) CheckUser(r *http.Request) (bool, string, error) {
+func (security *securityImpl) CheckUser(r *http.Request) (bool, string, error) {
 	token := r.Header.Get("X-Login-Token")
 	if token == "" {
 		return false, "", errors.New(constants.ERR_NOJWTPROVIDED)
@@ -65,7 +72,7 @@ func (s *securityImpl) CheckUser(r *http.Request) (bool, string, error) {
 		return false, "", err
 	}
 	email := fmt.Sprint(j["email"])
-	user, err := s.db.GetUserByEmail(email)
+	user, err := security.db.GetUserByEmail(email)
 	if err != nil {
 		return false, "", err
 	}

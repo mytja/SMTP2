@@ -3,32 +3,27 @@ package security
 import (
 	"errors"
 	"fmt"
+	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/sql"
-	"go.uber.org/zap"
-	"io/ioutil"
-	"net/http"
 )
 
-func VerifyEmailServer(mail sql.ReceivedMessage, logger *zap.SugaredLogger) error {
+func (security *securityImpl) VerifyEmailServer(mail sql.ReceivedMessage) error {
 	domain, err := helpers.GetHostnameFromURI(mail.URI)
 	if err != nil {
 		return err
 	}
-	logger.Info(domain)
+
+	security.logger.Debug(domain)
 	id := fmt.Sprint(mail.ServerID)
+
 	reqdom := domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.MVPPass
-	logger.Info(reqdom)
-	res, err := http.Get(reqdom)
+	security.logger.Debug(reqdom)
+	res, err := req.Get(reqdom)
 	if err != nil {
 		return err
 	}
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	bodystring := helpers.BytearrayToString(body)
+	bodystring := res.String()
 	if bodystring == "FAIL1" || bodystring == "FAIL2" || bodystring == "FAIL3" || bodystring == "FAIL" {
 		return errors.New("failed to verify origin")
 	}
@@ -38,29 +33,28 @@ func VerifyEmailServer(mail sql.ReceivedMessage, logger *zap.SugaredLogger) erro
 	return errors.New("invalid SMTP2 verification message")
 }
 
-func VerifyEmailSender(mail sql.ReceivedMessage, logger *zap.SugaredLogger) error {
+func (security *securityImpl) VerifyEmailSender(mail sql.ReceivedMessage) error {
 	domain, err := helpers.GetDomainFromEmail(mail.FromEmail)
 	if err != nil {
 		return err
 	}
-	logger.Info(domain)
+	security.logger.Info(domain)
 	id := fmt.Sprint(mail.ServerID)
-	protocol := "http://"
-	if constants.ForceHttpsForMailDomain {
-		protocol = "https://"
+
+	protocol, err := security.GetProtocolFromDomain(domain)
+	if err != nil {
+		return err
 	}
+
 	reqdom := protocol + domain + "/smtp2/message/verify?id=" + id + "&pass=" + mail.MVPPass
-	logger.Info(reqdom)
-	res, err := http.Get(reqdom)
+	security.logger.Info(reqdom)
+	res, err := req.Get(reqdom)
 	if err != nil {
 		return err
 	}
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	bodystring := helpers.BytearrayToString(body)
-	logger.Info(bodystring)
+
+	bodystring := res.String()
+	security.logger.Debug(bodystring)
 	if bodystring == "FAIL1" || bodystring == "FAIL2" || bodystring == "FAIL3" || bodystring == "FAIL" {
 		return errors.New("failed to verify origin")
 	}
@@ -70,12 +64,12 @@ func VerifyEmailSender(mail sql.ReceivedMessage, logger *zap.SugaredLogger) erro
 	return errors.New("invalid SMTP2 verification message")
 }
 
-func VerifyMessage(mail sql.ReceivedMessage, logger *zap.SugaredLogger) (bool, error) {
-	sendererr := VerifyEmailSender(mail, logger)
+func (security *securityImpl) VerifyMessage(mail sql.ReceivedMessage) (bool, error) {
+	sendererr := security.VerifyEmailSender(mail)
 	if sendererr != nil {
 		return false, sendererr
 	}
-	servererr := VerifyEmailServer(mail, logger)
-	logger.Info("SERVER_ERR", servererr)
+	servererr := security.VerifyEmailServer(mail)
+	security.logger.Debug("SERVER_ERR", servererr)
 	return servererr == nil, servererr
 }

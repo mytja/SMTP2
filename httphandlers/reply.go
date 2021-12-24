@@ -1,20 +1,18 @@
 package httphandlers
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
-	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
-// Disable anyone with JWT to reply. (remote server does that for us - not TO DO anymore)
 func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
@@ -49,6 +47,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Here we get either SentMessage or ReceivedMessage
 	var to string
+	var from_email string
 	if replytomsg.Type == "sent" {
 		message, err := server.db.GetSentMessage(replytoid)
 		if err != nil {
@@ -56,6 +55,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		to = message.ToEmail
+		from_email = message.FromEmail
 	} else {
 		message, err := server.db.GetReceivedMessage(replytoid)
 		if err != nil {
@@ -63,6 +63,12 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		to = message.FromEmail
+		from_email = message.ToEmail
+	}
+
+	if from_email != from {
+		WriteForbiddenJWT(w, errors.New("you don't own this message that you are replying to"))
+		return
 	}
 
 	todomain, err := helpers.GetDomainFromEmail(to)
@@ -72,24 +78,9 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Check if website has enabled HTTPS
-	resp, err := http.Get("http://" + todomain + "/smtp2/server/info")
+	protocol, err := server.security.GetProtocolFromDomain(todomain)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Remote server isn't avaiable at the moment. Failed to send message.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-	}
-	reqbody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read response body", Success: false}, http.StatusInternalServerError)
-		return
-	}
-	var resjson ServerInfo
-	err = json.Unmarshal(reqbody, &resjson)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed to unmarshal remote server's response.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	protocol := "http://"
-	if resjson.HasHTTPS {
-		protocol = "https://"
 	}
 
 	var originalid int
@@ -135,50 +126,48 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		urlprotocol = "https://"
 	}
 
-	reqdom := protocol + todomain + "/smtp2/message/receive"
-	req, err := http.NewRequest("POST", reqdom, strings.NewReader(""))
-	req.Header.Set("Title", title)
-	req.Header.Set("To", to)
-	req.Header.Set("From", from)
-	req.Header.Set("ServerPass", pass)
-	req.Header.Set("ReplyPass", replytomsg.ReplyPass)
-	req.Header.Set("ReplyID", replytomsg.ReplyID)
-	req.Header.Set("ServerID", fmt.Sprint(id))
-	req.Header.Set("OriginalID", fmt.Sprint(originalid))
-	req.Header.Set("MVPPass", fmt.Sprint(mvppass))
-	req.Header.Set(
-		"URI",
-		urlprotocol+server.config.HostURL+"/smtp2/message/get/"+fmt.Sprint(id)+"?pass="+pass,
-	)
+	mailurl := urlprotocol + server.config.HostURL + "/smtp2/message/get/" + fmt.Sprint(id) + "?pass=" + pass
 
-	res, err := http.DefaultClient.Do(req)
+	headers := SentMessage{
+		Title:      reply.Title,
+		To:         reply.ToEmail,
+		From:       reply.FromEmail,
+		ServerPass: reply.Pass,
+		ReplyPass:  basemsg.ReplyPass,
+		ReplyID:    basemsg.ReplyID,
+		OriginalID: fmt.Sprint(originalid),
+		ServerID:   fmt.Sprint(id),
+		MVPPass:    mvppass,
+		URI:        mailurl,
+	}
+
+	reqdom := protocol + todomain + "/smtp2/message/receive"
+	res, err := req.Post(reqdom, req.HeaderFromStruct(headers))
 	if err != nil {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to request to remote server", Success: false}, http.StatusForbidden)
 		return
 	}
-	if res.StatusCode == http.StatusCreated {
+
+	code := res.Response().StatusCode
+	resbody := res.String()
+
+	if code == http.StatusCreated {
 		// And let's make a 201 response
 		WriteJSON(w, Response{Data: "OK", Success: true}, http.StatusCreated)
 		return
 	}
 
-	body2, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Error while reading request body", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	if res.StatusCode == http.StatusNotAcceptable {
+	if code == http.StatusNotAcceptable {
 		server.logger.Error("Server has denied message")
-		WriteJSON(w, Response{Data: helpers.BytearrayToString(body2), Success: false}, http.StatusNotAcceptable)
+		WriteJSON(w, Response{Data: resbody, Success: false}, http.StatusNotAcceptable)
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
 		return
 	}
-	server.logger.Info(req.Header.Get("URI"))
-	server.logger.Info(reqdom)
+	server.logger.Debugw("message details", "mail_url", mailurl, "domain", reqdom)
 	if constants.EnableDeletingOnUnknownError {
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
 	}
-	WriteJSON(w, Response{Data: res.StatusCode, Error: "Unknown error: " + helpers.BytearrayToString(body2), Success: false}, http.StatusInternalServerError)
+	WriteJSON(w, Response{Data: code, Error: fmt.Sprint("Unknown error: ", resbody), Success: false}, http.StatusInternalServerError)
 }
