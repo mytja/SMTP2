@@ -22,7 +22,7 @@ func (server *httpImpl) GetSentMessageHandler(w http.ResponseWriter, r *http.Req
 		WriteJSON(w, Response{Data: "Message doesn't exist or internal server error", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
 	}
-	basemessage, err := server.db.GetOriginalMessageFromOriginalID(id)
+	basemessage, err := server.db.GetMessageFromReplyTo(id)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to retrieve base message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
 		return
@@ -205,7 +205,7 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 	bodystring := resp.String()
 
 	if code != http.StatusOK {
-		WriteJSON(w, Response{Data: bodystring, Success: false}, code)
+		WriteJSON(w, Response{Data: bodystring, Success: false, Error: "Request failed on server side"}, code)
 		return
 	}
 	server.logger.Debug(bodystring)
@@ -232,6 +232,14 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		attachments = append(attachments, attachment)
 	}
 	j.Data.Attachments = attachments
+
+	basemsg, err := server.db.GetMessageFromReplyTo(id)
+	if err != nil {
+		WriteJSON(w, Response{Error: err.Error(), Data: "Could not retrieve base message from database", Success: false}, http.StatusInternalServerError)
+		return
+	}
+	replies, err := server.db.GetReplies(*basemsg, username)
+	j.Data.Replies = replies
 
 	// We don't handle error, as it's not as important to mark as read message
 	msg.IsRead = true

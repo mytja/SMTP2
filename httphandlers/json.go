@@ -64,13 +64,14 @@ type InboxDataResponse struct {
 }
 
 type ReceivedMessageData struct {
-	ID          int          `json:"ID"`
-	ServerID    int          `json:"ServerID"`
-	Title       string       `json:"Title"`
-	Receiver    string       `json:"Receiver"`
-	Sender      string       `json:"Sender"`
-	Attachments []Attachment `json:"Attachments"`
-	Body        string       `json:"Body"`
+	ID          int           `json:"ID"`
+	ServerID    int           `json:"ServerID"`
+	Title       string        `json:"Title"`
+	Receiver    string        `json:"Receiver"`
+	Sender      string        `json:"Sender"`
+	Attachments []Attachment  `json:"Attachments"`
+	Body        string        `json:"Body"`
+	Replies     []interface{} `json:"Replies"`
 }
 
 type ReceivedMessageResponse struct {
