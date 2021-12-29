@@ -42,7 +42,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to parse email address to get domain", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	if fromemail != server.config.HostURL {
+	if fromemail != server.config.HostURL && !server.config.SkipSameDomainCheck {
 		WriteJSON(w, Response{Data: "This server doesn't hold your domain.", Success: false}, http.StatusForbidden)
 		return
 	}

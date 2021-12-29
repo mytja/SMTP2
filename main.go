@@ -34,6 +34,7 @@ func main() {
 	command.Flags().StringVar(&config.DBDriver, "dbname", "sqlite3", "DB Driver name")
 	command.Flags().BoolVar(&useenv, "useenv", false, "Use environment variables and ignore this selection")
 	command.Flags().StringVar(&config.AV_URL, "avurl", "http://clamapi:3000/api/v1/scan", "Antivirus URL with endpoint to scan")
+	command.Flags().BoolVar(&config.SkipSameDomainCheck, "skip-samedomain-check", false, "Skip same-domain check while registering account")
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -45,6 +46,12 @@ func main() {
 			config.Debug = false
 		} else {
 			config.Debug = true
+		}
+		samedomain := os.Getenv("SMTP2_SKIP_SAMEDOMAIN_CHECK")
+		if samedomain == "" {
+			config.SkipSameDomainCheck = false
+		} else {
+			config.SkipSameDomainCheck = true
 		}
 		httpsenabled := os.Getenv("SMTP2_HTTPS_ENABLED")
 		if httpsenabled == "" {

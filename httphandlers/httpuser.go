@@ -39,7 +39,7 @@ func (server *httpImpl) NewUser(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to extract domain from email", Success: false}, http.StatusBadRequest)
 		return
 	}
-	if server.config.HostURL != domain {
+	if server.config.HostURL != domain && !server.config.SkipSameDomainCheck {
 		WriteJSON(w, Response{Data: "This server doesn't host your domain", Success: false}, http.StatusForbidden)
 		return
 	}

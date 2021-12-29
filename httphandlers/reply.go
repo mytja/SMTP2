@@ -27,7 +27,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve domain from email", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	if fromemail != server.config.HostURL {
+	if fromemail != server.config.HostURL && !server.config.SkipSameDomainCheck {
 		WriteJSON(w, Response{Data: "This server doesn't hold your domain.", Success: false}, http.StatusForbidden)
 		return
 	}
