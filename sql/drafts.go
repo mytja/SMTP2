@@ -16,8 +16,8 @@ func NewDraftMessage(id int, originalID int, replypass string, replyid string) M
 		ID:         id,
 		OriginalID: originalID,
 		ServerID:   -1,
-		ReplyPass:  "",
-		ReplyID:    "",
+		ReplyPass:  replypass,
+		ReplyID:    replyid,
 		Type:       "sent",
 		IsDraft:    true,
 	}

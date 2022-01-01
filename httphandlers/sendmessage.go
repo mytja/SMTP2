@@ -51,6 +51,8 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 	var originalid = -1
 	var serverid = -1
 	var draftid int
+	var reply_pass = ""
+	var reply_id = ""
 
 	if usedraft != "" {
 		draftid, err = strconv.Atoi(usedraft)
@@ -83,6 +85,8 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 		title = message.Title
 		body = message.Body
 		to = message.ToEmail
+		reply_id = basemsg.ReplyID
+		reply_pass = basemsg.ReplyPass
 	}
 	if !strings.Contains(to, "@") {
 		WriteJSON(w, Response{Data: "Invalid To address", Success: false}, http.StatusBadRequest)
@@ -103,15 +107,17 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
-		replyPass, err := security.GenerateRandomString(80)
-		if err != nil {
-			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
-			return
-		}
-		replyID, err := security.GenerateRandomString(80)
-		if err != nil {
-			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
-			return
+		if reply_pass == "" && reply_id == "" && iscreatedfromdraft {
+			reply_pass, err = security.GenerateRandomString(80)
+			if err != nil {
+				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
+				return
+			}
+			reply_id, err = security.GenerateRandomString(80)
+			if err != nil {
+				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
+				return
+			}
 		}
 		mvppass, err := security.GenerateRandomString(80)
 		if err != nil {
@@ -139,7 +145,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			responseMap = append(responseMap, result)
 			break
 		}
-		basemsg := sql.NewMessage(id, originalid, serverid, replyPass, replyID, "sent", false)
+		basemsg := sql.NewMessage(id, originalid, serverid, reply_pass, reply_id, "sent", false)
 		err = server.db.CommitMessage(basemsg)
 		if err != nil {
 			result["Body"] = "Error while committing base Message to database."

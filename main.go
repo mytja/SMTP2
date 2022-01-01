@@ -123,7 +123,8 @@ func main() {
 	// Message & replying
 	r.HandleFunc("/smtp2/message/receive", httphandler.ReceiveMessageHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/new", httphandler.NewMessageHandler).Methods(httphandlers.POST)
-	r.HandleFunc("/smtp2/message/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/inbox/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/inbox/sent", httphandler.GetSentInboxHandler).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/message/update", httphandler.UpdateMessage).Methods(httphandlers.PATCH)
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)
@@ -157,7 +158,7 @@ func main() {
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
-		AllowedHeaders: []string{"X-Login-Token"},
+		AllowedHeaders: []string{"X-Login-Token", "ReplyTo"},
 		AllowedMethods: []string{httphandlers.POST, httphandlers.GET, httphandlers.DELETE, httphandlers.PATCH, httphandlers.PUT},
 		Debug:          config.Debug,
 	})

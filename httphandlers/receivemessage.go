@@ -17,8 +17,8 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 	from := q.Get("From")
 	id := q.Get("ServerID")
 	pass := q.Get("ServerPass")
-	replyid := q.Get("ReplyPass")
-	replypass := q.Get("ReplyID")
+	replypass := q.Get("ReplyPass")
+	replyid := q.Get("ReplyID")
 	originalid := q.Get("OriginalID")
 	mvppass := q.Get("MVPPass")
 	if replyid == "" || replypass == "" || mvppass == "" {

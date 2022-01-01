@@ -27,7 +27,7 @@ func (db *sqlImpl) GetReplies(originalMessage Message, user string) ([]interface
 	var message []Message
 	err := db.db.Select(
 		&message,
-		"SELECT * FROM messages WHERE id>$1 AND reply_id=$2 AND reply_pass=$3",
+		"SELECT * FROM messages WHERE id>$1 AND reply_id=$2 AND reply_pass=$3 AND is_draft=false",
 		originalMessage.ID, originalMessage.ReplyID, originalMessage.ReplyPass,
 	)
 	if err != nil {

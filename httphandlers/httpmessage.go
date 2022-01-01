@@ -74,6 +74,7 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	server.logger.Info(username)
+
 	inbox, err := server.db.GetInbox(username)
 	if err != nil {
 		server.logger.Info(err)
@@ -93,6 +94,38 @@ func (server *httpImpl) GetInboxHandler(w http.ResponseWriter, r *http.Request) 
 			Sender:   msg.FromEmail,
 			Title:    msg.Title,
 			IsRead:   msg.IsRead,
+		}
+		m.Data = append(m.Data, m1)
+	}
+	WriteJSON(w, m, http.StatusOK)
+}
+
+func (server *httpImpl) GetSentInboxHandler(w http.ResponseWriter, r *http.Request) {
+	isAuth, username, err := server.security.CheckUser(r)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+	server.logger.Info(username)
+
+	inbox, err := server.db.GetAllSentMessages(username)
+	if err != nil {
+		server.logger.Info(err)
+		return
+	}
+	protocol := "http://"
+	if server.config.HTTPSEnabled {
+		protocol = "https://"
+	}
+	var m = InboxDataResponse{Data: make([]MessageData, 0)}
+	for i := 0; i < len(inbox); i++ {
+		msg := inbox[i]
+		var m1 = MessageData{
+			ID:       msg.ID,
+			URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID),
+			Receiver: msg.ToEmail,
+			Sender:   msg.FromEmail,
+			Title:    msg.Title,
 		}
 		m.Data = append(m.Data, m1)
 	}

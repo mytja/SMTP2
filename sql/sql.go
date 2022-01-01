@@ -20,6 +20,7 @@ type SQL interface {
 	GetDB() *sqlx.DB
 	CommitReceivedMessages(ReceivedMessage) error
 	GetInbox(string) ([]ReceivedMessage, error)
+	GetAllSentMessages(string) ([]SentMessage, error)
 	GenerateNewTransaction()
 	NewUser(string, string) error
 	GetUserByEmail(string) (User, error)
