@@ -422,11 +422,11 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 		}
 		server.logger.Info("AV request unmarshaled")
 		if !analysisresult.Success {
-			WriteJSON(w, Response{Data: fmt.Sprint(string(avbody), " - ", analysisresult), Success: false, Error: "AV scan failed"}, http.StatusBadGateway)
+			WriteJSON(w, Response{Data: fmt.Sprint(string(avbody), " - ", analysisresult), Success: false, Error: "AV scan failed"}, http.StatusInternalServerError)
 			return
 		}
 		if analysisresult.Data.Result[0].IsInfected {
-			WriteJSON(w, Response{Data: "This file is infected with malware", Error: analysisresult.Data.Result[0].Viruses[0], Success: false}, http.StatusInternalServerError)
+			WriteJSON(w, Response{Data: "This file is infected with malware", Error: analysisresult.Data.Result[0].Viruses[0], Success: false}, http.StatusBadGateway)
 			return
 		}
 		server.logger.Info("AV request done", analysisresult)

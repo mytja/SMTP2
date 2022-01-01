@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt"
-	"github.com/mytja/SMTP2/helpers/constants"
+	"github.com/mytja/SMTP2/helpers"
 	"github.com/mytja/SMTP2/sql"
 	"go.uber.org/zap"
 	"net/http"
@@ -34,11 +34,11 @@ func GetJWTFromUserPass(email string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": email,
-		"iss":   constants.JwtIssuer,
+		"iss":   helpers.JwtIssuer,
 		"exp":   expirationTime.Unix(),
 	})
 
-	return token.SignedString(constants.JwtSigningKey)
+	return token.SignedString(helpers.JwtSigningKey)
 }
 
 func CheckJWT(tokenString string) (jwt.MapClaims, error) {
@@ -49,11 +49,11 @@ func CheckJWT(tokenString string) (jwt.MapClaims, error) {
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return constants.JwtSigningKey, nil
+		return helpers.JwtSigningKey, nil
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		if claims["iss"] == constants.JwtIssuer {
+		if claims["iss"] == helpers.JwtIssuer {
 			return claims, nil
 		}
 		return nil, errors.New("JWT issuer isn't correct")
@@ -65,7 +65,7 @@ func CheckJWT(tokenString string) (jwt.MapClaims, error) {
 func (security *securityImpl) CheckUser(r *http.Request) (bool, string, error) {
 	token := r.Header.Get("X-Login-Token")
 	if token == "" {
-		return false, "", errors.New(constants.ERR_NOJWTPROVIDED)
+		return false, "", errors.New("unauthenticated")
 	}
 	j, err := CheckJWT(token)
 	if err != nil {

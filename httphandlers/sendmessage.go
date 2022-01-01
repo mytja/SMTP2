@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
@@ -238,7 +237,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 
 		if code == http.StatusCreated {
 			// Mogoče dodaj tukaj kej
-		} else if code == http.StatusNotAcceptable || constants.EnableDeletingOnUnknownError {
+		} else if code == http.StatusNotAcceptable || helpers.EnableDeletingOnUnknownError {
 			server.db.DeleteMessage(basemsg.ID)
 			server.db.DeleteSentMessage(msg.ID)
 		}

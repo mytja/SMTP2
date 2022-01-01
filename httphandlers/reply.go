@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/imroc/req"
 	"github.com/mytja/SMTP2/helpers"
-	"github.com/mytja/SMTP2/helpers/constants"
 	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
@@ -165,7 +164,7 @@ func (server *httpImpl) NewReplyHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	server.logger.Debugw("message details", "mail_url", mailurl, "domain", reqdom)
-	if constants.EnableDeletingOnUnknownError {
+	if helpers.EnableDeletingOnUnknownError {
 		server.db.DeleteMessage(basemsg.ID)
 		server.db.DeleteSentMessage(reply.ID)
 	}
