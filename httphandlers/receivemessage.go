@@ -69,7 +69,8 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 				"equality_from", originalmsg.FromEmail == from,
 			)
 			// TODO: Make this if routine better
-			if !(originalmessage.ServerID == -1 && originalmsg.ToEmail == to && originalmsg.FromEmail == from) {
+			if !((originalmessage.ServerID == -1 && originalmsg.ToEmail == to && originalmsg.FromEmail == from) ||
+				(originalmessage.ServerID == -1 && originalmsg.ToEmail == from && originalmsg.FromEmail == to)) {
 				server.logger.Debug("message wasn't sent by owner")
 				WriteJSON(w, Response{Data: "You didn't send this message...", Success: false}, http.StatusNotAcceptable)
 				return
