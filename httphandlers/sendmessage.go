@@ -107,7 +107,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
-		if reply_pass == "" && reply_id == "" && iscreatedfromdraft {
+		if reply_pass == "" && reply_id == "" && !iscreatedfromdraft {
 			reply_pass, err = security.GenerateRandomString(80)
 			if err != nil {
 				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)

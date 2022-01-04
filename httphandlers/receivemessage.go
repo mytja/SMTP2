@@ -56,7 +56,25 @@ func (server *httpImpl) ReceiveMessageHandler(w http.ResponseWriter, r *http.Req
 				WriteJSON(w, Response{Error: err.Error(), Data: "Unable to retrieve original message from SentMessages.", Success: false}, http.StatusInternalServerError)
 				return
 			}
-			if !(originalmsg.ToEmail == from && originalmsg.FromEmail == to) {
+			// V tem primeru je bilo poslano iz istega strežnika - strežnik je isti pri prejemniku in pri pošiljatelju
+			server.logger.Debugw(
+				"message data",
+				"original From", originalmsg.FromEmail,
+				"original To", originalmsg.ToEmail,
+				"to", to,
+				"from", from,
+				"serverid", originalmessage.ServerID,
+				"equality_server_id", originalmessage.ServerID == -1,
+				"equality_to", originalmsg.ToEmail == to,
+				"equality_from", originalmsg.FromEmail == from,
+			)
+			// TODO: Make this if routine better
+			if !(originalmessage.ServerID == -1 && originalmsg.ToEmail == to && originalmsg.FromEmail == from) {
+				server.logger.Debug("message wasn't sent by owner")
+				WriteJSON(w, Response{Data: "You didn't send this message...", Success: false}, http.StatusNotAcceptable)
+				return
+			} else if originalmessage.ServerID != -1 && !(originalmsg.ToEmail == from && originalmsg.FromEmail == to) {
+				// V tem primeru je bilo poslano iz drugega strežnika
 				WriteJSON(w, Response{Data: "You didn't send this message...", Success: false}, http.StatusNotAcceptable)
 				return
 			}
