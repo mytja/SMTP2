@@ -272,6 +272,10 @@ func (server *httpImpl) RetrieveMessageFromRemoteServer(w http.ResponseWriter, r
 		return
 	}
 	replies, err := server.db.GetReplies(*basemsg, username)
+	if err != nil {
+		WriteJSON(w, Response{Error: err.Error(), Data: "Could not retrieve replies from database", Success: false}, http.StatusInternalServerError)
+		return
+	}
 	j.Data.Replies = replies
 
 	// We don't handle error, as it's not as important to mark as read message
