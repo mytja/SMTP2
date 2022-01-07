@@ -1,9 +1,6 @@
 package sql
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 type SentMessageJSON struct {
 	ID        int    `json:"ID"`
@@ -41,37 +38,36 @@ func (db *sqlImpl) GetReplies(originalMessage Message, user string) ([]interface
 			if err != nil {
 				return nil, err
 			}
-			if sentMessage.FromEmail != user {
-				return nil, errors.New("unauthenticated")
+			if sentMessage.FromEmail == user {
+				app := SentMessageJSON{
+					ToEmail:   sentMessage.ToEmail,
+					FromEmail: sentMessage.FromEmail,
+					ID:        sentMessage.ID,
+					Title:     sentMessage.Title,
+					Body:      sentMessage.Body,
+					Type:      "sent",
+				}
+				messagesMap = append(messagesMap, app)
 			}
-			app := SentMessageJSON{
-				ToEmail:   sentMessage.ToEmail,
-				FromEmail: sentMessage.FromEmail,
-				ID:        sentMessage.ID,
-				Title:     sentMessage.Title,
-				Body:      sentMessage.Body,
-				Type:      "sent",
-			}
-			messagesMap = append(messagesMap, app)
 		}
 		if msg.Type == "received" {
 			sentMessage, err := db.GetReceivedMessage(msg.ID)
 			if err != nil {
 				return nil, err
 			}
-			if sentMessage.ToEmail != user {
-				return nil, errors.New("unauthenticated")
+			// This allows us to retrieve only messages for specific user, without interrupting others
+			// when we send to same server
+			if sentMessage.ToEmail == user {
+				app := ReceivedMessageJSON{
+					ToEmail:   sentMessage.ToEmail,
+					FromEmail: sentMessage.FromEmail,
+					ID:        sentMessage.ID,
+					Title:     sentMessage.Title,
+					URI:       "/smtp2/message/retrieve/" + fmt.Sprint(sentMessage.ID),
+					Type:      "received",
+				}
+				messagesMap = append(messagesMap, app)
 			}
-
-			app := ReceivedMessageJSON{
-				ToEmail:   sentMessage.ToEmail,
-				FromEmail: sentMessage.FromEmail,
-				ID:        sentMessage.ID,
-				Title:     sentMessage.Title,
-				URI:       "/smtp2/message/retrieve/" + fmt.Sprint(sentMessage.ID),
-				Type:      "received",
-			}
-			messagesMap = append(messagesMap, app)
 		}
 	}
 	return messagesMap, nil
