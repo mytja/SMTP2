@@ -45,6 +45,7 @@ type SQL interface {
 	UpdateReceivedMessage(ReceivedMessage) error
 	GetReplies(Message, string) ([]interface{}, error)
 	UpdateUserData(User) error
+	DeleteReceivedMessage(int) error
 }
 
 func NewSQL(driver string, drivername string, logger *zap.SugaredLogger) (SQL, error) {

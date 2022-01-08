@@ -22,6 +22,13 @@ func (db *sqlImpl) GetReceivedMessage(id int) (*ReceivedMessage, error) {
 	return &message, nil
 }
 
+func (db *sqlImpl) DeleteReceivedMessage(ID int) error {
+	db.GenerateNewTransaction()
+	db.tx.MustExec("DELETE FROM receivedmsgs WHERE id=$1", ID)
+	err := db.Commit()
+	return err
+}
+
 func (db *sqlImpl) CommitReceivedMessages(msg ReceivedMessage) error {
 	res, err := db.tx.NamedExec(
 		"INSERT INTO receivedmsgs (id, title, uri, to_email, from_email, server_id, server_pass, warning, mvp_pass, is_read) VALUES (:id, :title, :uri, :to_email, :from_email, :server_id, :server_pass, :warning, :mvp_pass, :is_read)",

@@ -200,18 +200,34 @@ func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message, err := server.db.GetSentMessage(id)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed to retrieve Sent message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
-		return
-	}
+	basemsg, err := server.db.GetMessageFromReplyTo(id)
+	if basemsg.Type == "sent" {
+		message, err := server.db.GetSentMessage(id)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed to retrieve Sent message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
+			return
+		}
 
-	if message.FromEmail != from {
-		WriteJSON(w, Response{Data: "You don't have permission to delete this message", Success: false}, http.StatusForbidden)
-		return
-	}
+		if message.FromEmail != from {
+			WriteJSON(w, Response{Data: "You don't have permission to delete this message", Success: false}, http.StatusForbidden)
+			return
+		}
 
-	server.db.DeleteSentMessage(id)
+		server.db.DeleteSentMessage(id)
+	} else {
+		message, err := server.db.GetReceivedMessage(id)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed to retrieve Received message from database", Error: err.Error(), Success: false}, http.StatusNotFound)
+			return
+		}
+
+		if message.ToEmail != from {
+			WriteJSON(w, Response{Data: "You don't have permission to delete this message", Success: false}, http.StatusForbidden)
+			return
+		}
+
+		server.db.DeleteReceivedMessage(id)
+	}
 	server.db.DeleteMessage(id)
 
 	WriteJSON(w, Response{Data: "OK", Success: true}, http.StatusOK)
