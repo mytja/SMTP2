@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/imroc/req"
-	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"strconv"
 )
@@ -120,14 +119,21 @@ func (server *httpImpl) GetSentInboxHandler(w http.ResponseWriter, r *http.Reque
 	var m = InboxDataResponse{Data: make([]MessageData, 0)}
 	for i := 0; i < len(inbox); i++ {
 		msg := inbox[i]
-		var m1 = MessageData{
-			ID:       msg.ID,
-			URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID),
-			Receiver: msg.ToEmail,
-			Sender:   msg.FromEmail,
-			Title:    msg.Title,
+		basemsg, err := server.db.GetMessageFromReplyTo(msg.ID)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed to retrieve base message from database", Success: false, Error: err.Error()}, http.StatusInternalServerError)
+			return
 		}
-		m.Data = append(m.Data, m1)
+		if !basemsg.IsDraft {
+			var m1 = MessageData{
+				ID:       msg.ID,
+				URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID),
+				Receiver: msg.ToEmail,
+				Sender:   msg.FromEmail,
+				Title:    msg.Title,
+			}
+			m.Data = append(m.Data, m1)
+		}
 	}
 	WriteJSON(w, m, http.StatusOK)
 }
@@ -169,9 +175,11 @@ func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 		to = originaldraft.ToEmail
 	}
 
-	sentmsg := sql.NewDraftSentMessage(idint, title, to, from, body)
+	originaldraft.Title = title
+	originaldraft.ToEmail = to
+	originaldraft.Body = body
 
-	err = server.db.UpdateDraftSentMessage(sentmsg)
+	err = server.db.UpdateDraftSentMessage(*originaldraft)
 	if err != nil {
 		WriteJSON(w, Response{Error: err.Error(), Success: false, Data: "[FATAL] Failed to update draft message"}, http.StatusInternalServerError)
 		return

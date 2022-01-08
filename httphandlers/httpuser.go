@@ -72,3 +72,25 @@ func (server *httpImpl) NewUser(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, Response{Data: "Success", Success: true}, http.StatusCreated)
 }
+
+func (server *httpImpl) UpdateSignature(w http.ResponseWriter, r *http.Request) {
+	isOk, from, err := server.security.CheckUser(r)
+	if err != nil && !isOk {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+	user, err := server.db.GetUserByEmail(from)
+	if err != nil {
+		WriteJSON(w, Response{Success: false, Data: "Failed to retrieve User from database", Error: err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	newSignature := r.FormValue("Signature")
+	user.Signature = newSignature
+
+	err = server.db.UpdateUserData(user)
+	if err != nil {
+		WriteJSON(w, Response{Success: false, Data: "Failed to commit update to database", Error: err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	WriteJSON(w, Response{Success: true, Data: "OK"}, http.StatusOK)
+}

@@ -11,6 +11,7 @@ type DraftResponse struct {
 	ID    int    `json:"ID"`
 	To    string `json:"To"`
 	Title string `json:"Title"`
+	Body  string `json:"Body"`
 }
 
 func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +27,12 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 	var originalid = -1
 	var to = ""
 	var title = ""
+
+	user, err := server.db.GetUserByEmail(from)
+	if err != nil {
+		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve User from database", Success: false}, http.StatusNotFound)
+		return
+	}
 
 	replyto := r.Header.Get("ReplyTo")
 	if replyto != "" {
@@ -63,7 +70,7 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 
 	id := server.db.GetLastMessageID()
 	msg := sql.NewDraftMessage(id, originalid, replypass, replyid)
-	sentmsg := sql.NewDraftSentMessage(id, title, to, from, "")
+	sentmsg := sql.NewDraftSentMessage(id, title, to, from, fmt.Sprint("", "\n", user.Signature))
 	err = server.db.CommitMessage(msg)
 	if err != nil {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit base Message to database", Success: false}, http.StatusInternalServerError)
@@ -74,5 +81,5 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit SentMessage to database", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: title, To: to}, Success: true}, http.StatusCreated)
+	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: title, To: to, Body: sentmsg.Body}, Success: true}, http.StatusCreated)
 }

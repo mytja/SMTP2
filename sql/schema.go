@@ -1,6 +1,6 @@
 package sql
 
-var schema string = `
+const schema string = `
 CREATE TABLE IF NOT EXISTS receivedmsgs (
 	id           INTEGER       PRIMARY KEY,
     uri          VARCHAR(250)  NOT NULL,
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS sentmsgs (
 CREATE TABLE IF NOT EXISTS users (
     id           INTEGER       PRIMARY KEY,
     email        VARCHAR(250)  NOT NULL,
-    pass         VARCHAR(250)  NOT NULL
+    pass         VARCHAR(250)  NOT NULL,
+	signature    VARCHAR(250)
 );
 `
