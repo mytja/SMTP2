@@ -2,6 +2,7 @@ package httphandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/imroc/req"
@@ -127,7 +128,7 @@ func (server *httpImpl) GetSentInboxHandler(w http.ResponseWriter, r *http.Reque
 		if !basemsg.IsDraft {
 			var m1 = MessageData{
 				ID:       msg.ID,
-				URI:      protocol + server.config.HostURL + "/smtp2/message/retrieve/" + fmt.Sprint(msg.ID),
+				URI:      protocol + server.config.HostURL + "/smtp2/message/sent/get/" + fmt.Sprint(msg.ID),
 				Receiver: msg.ToEmail,
 				Sender:   msg.FromEmail,
 				Title:    msg.Title,
@@ -336,4 +337,31 @@ func (server *httpImpl) MarkReadUnread(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, Response{Data: "Failed to mark as read/unread", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
+}
+
+func (server *httpImpl) GetSentMessageData(w http.ResponseWriter, r *http.Request) {
+	ok, from, err := server.security.CheckUser(r)
+	if err != nil || !ok {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to parse ID", Error: err.Error(), Success: false}, http.StatusBadRequest)
+		return
+	}
+
+	msg, err := server.db.GetSentMessage(id)
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to retrieve Sent message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		return
+	}
+
+	if msg.FromEmail != from {
+		WriteForbiddenJWT(w, errors.New(""))
+		return
+	}
+
+	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: msg.Title, To: msg.ToEmail, Body: msg.Body}, Success: true}, http.StatusOK)
 }

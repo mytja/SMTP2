@@ -129,6 +129,8 @@ func main() {
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)
 	r.HandleFunc("/smtp2/message/mark/read/{id}", httphandler.MarkReadUnread).Methods(httphandlers.PATCH)
+	// To retrieve SentMessage using JWT
+	r.HandleFunc("/smtp2/message/sent/get/{id}", httphandler.GetSentMessageData).Methods(httphandlers.GET)
 	// Get message from sender server (SentMessage) - recipient server -> sender server
 	r.HandleFunc("/smtp2/message/get/{id}", httphandler.GetSentMessageHandler).Methods(httphandlers.GET)
 	// Get message from remote server
