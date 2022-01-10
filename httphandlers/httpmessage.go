@@ -363,5 +363,5 @@ func (server *httpImpl) GetSentMessageData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: msg.Title, To: msg.ToEmail, Body: msg.Body}, Success: true}, http.StatusOK)
+	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: msg.Title, To: msg.ToEmail, Body: msg.Body, From: msg.FromEmail}, Success: true}, http.StatusOK)
 }

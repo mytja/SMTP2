@@ -12,6 +12,7 @@ type DraftResponse struct {
 	To    string `json:"To"`
 	Title string `json:"Title"`
 	Body  string `json:"Body"`
+	From  string `json:"From"`
 }
 
 func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
