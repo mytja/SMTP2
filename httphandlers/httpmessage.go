@@ -166,7 +166,7 @@ func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	basemsg, err := server.db.GetOriginalMessageFromOriginalID(idint)
+	basemsg, err := server.db.GetMessageFromReplyTo(idint)
 	if err != nil {
 		WriteJSON(w, Response{Data: "Failed to retrieve base draft message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
