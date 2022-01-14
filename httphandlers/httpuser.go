@@ -6,6 +6,11 @@ import (
 	"net/http"
 )
 
+type UserResponse struct {
+	Email     string `json:"email"`
+	Signature string `json:"signature"`
+}
+
 func (server *httpImpl) Login(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("Email")
 	pass := r.FormValue("Pass")
@@ -93,4 +98,19 @@ func (server *httpImpl) UpdateSignature(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	WriteJSON(w, Response{Success: true, Data: "OK"}, http.StatusOK)
+}
+
+func (server *httpImpl) GetUserData(w http.ResponseWriter, r *http.Request) {
+	isOk, from, err := server.security.CheckUser(r)
+	if err != nil && !isOk {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+	user, err := server.db.GetUserByEmail(from)
+	if err != nil {
+		WriteJSON(w, Response{Success: false, Data: "Failed to retrieve User from database", Error: err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, Response{Success: true, Data: UserResponse{Email: user.Email, Signature: user.Signature}}, http.StatusOK)
 }

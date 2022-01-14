@@ -107,13 +107,15 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 			return
 		}
-		if reply_pass == "" && reply_id == "" {
-			reply_pass, err = security.GenerateRandomString(80)
+		var rplypass = reply_pass
+		var rplyid = reply_id
+		if rplypass == "" && rplyid == "" {
+			rplypass, err = security.GenerateRandomString(80)
 			if err != nil {
 				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 				return
 			}
-			reply_id, err = security.GenerateRandomString(80)
+			rplyid, err = security.GenerateRandomString(80)
 			if err != nil {
 				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to generate random password", Success: false}, http.StatusInternalServerError)
 				return
@@ -145,7 +147,7 @@ func (server *httpImpl) NewMessageHandler(w http.ResponseWriter, r *http.Request
 			responseMap = append(responseMap, result)
 			break
 		}
-		basemsg := sql.NewMessage(id, originalid, serverid, reply_pass, reply_id, "sent", false)
+		basemsg := sql.NewMessage(id, originalid, serverid, rplypass, rplyid, "sent", false)
 		err = server.db.CommitMessage(basemsg)
 		if err != nil {
 			result["Body"] = "Error while committing base Message to database."

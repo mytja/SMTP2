@@ -43,6 +43,7 @@ type HTTP interface {
 	Login(w http.ResponseWriter, r *http.Request)
 	NewUser(w http.ResponseWriter, r *http.Request)
 	UpdateSignature(w http.ResponseWriter, r *http.Request)
+	GetUserData(w http.ResponseWriter, r *http.Request)
 
 	// receivemessage.go
 	ReceiveMessageHandler(w http.ResponseWriter, r *http.Request)

@@ -151,6 +151,7 @@ func main() {
 	r.HandleFunc("/smtp2/user/new", httphandler.NewUser).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/user/login", httphandler.Login).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/user/update/signature", httphandler.UpdateSignature).Methods(httphandlers.PATCH)
+	r.HandleFunc("/smtp2/user/get", httphandler.GetUserData).Methods(httphandlers.GET)
 
 	// SMTP2 Sender Server Verification Protocol
 	r.HandleFunc("/smtp2/message/verify", httphandler.MessageVerificationHandlers).Methods(httphandlers.GET)
