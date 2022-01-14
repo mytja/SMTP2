@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN signature VARCHAR(255) DEFAULT "";
