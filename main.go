@@ -143,7 +143,9 @@ func main() {
 	// Attachment handling
 	r.HandleFunc("/smtp2/attachment/upload/{id}", httphandler.UploadFile).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.DeleteAttachment).Methods(httphandlers.DELETE)
+	// Retrieve by JWT
 	r.HandleFunc("/smtp2/attachment/get/{mid}/{aid}", httphandler.GetAttachment).Methods(httphandlers.GET)
+	// Retrieve by password
 	r.HandleFunc("/smtp2/attachment/retrieve/{mid}/{aid}", httphandler.RetrieveAttachment).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/attachment/remote/get/{mid}/{aid}", httphandler.RetrieveAttachmentFromRemoteServer).Methods(httphandlers.GET)
 

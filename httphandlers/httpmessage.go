@@ -358,10 +358,48 @@ func (server *httpImpl) GetSentMessageData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	basemsg, err := server.db.GetMessageFromReplyTo(id)
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to retrieve Base message from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		return
+	}
+
 	if msg.FromEmail != from {
 		WriteForbiddenJWT(w, errors.New(""))
 		return
 	}
 
-	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: msg.Title, To: msg.ToEmail, Body: msg.Body, From: msg.FromEmail}, Success: true}, http.StatusOK)
+	attachments, err := server.db.GetAllAttachments(id)
+	if err != nil {
+		WriteJSON(w, Response{Data: "Failed to retrieve attachments", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		return
+	}
+
+	protocol := "http://"
+	if server.config.HTTPSEnabled {
+		protocol = "https://"
+	}
+
+	attachmentsList := make([]Attachment, 0)
+	replies, err := server.db.GetReplies(*basemsg, from)
+
+	for i := 0; i < len(attachments); i++ {
+		a := attachments[i]
+		attachment := Attachment{
+			ID:       a.ID,
+			Filename: a.OriginalName,
+			URL:      fmt.Sprintf("%s%s/smtp2/attachment/get/%s/%s", protocol, server.config.HostURL, fmt.Sprint(id), fmt.Sprint(a.ID)),
+		}
+		attachmentsList = append(attachmentsList, attachment)
+	}
+
+	WriteJSON(w, Response{Data: ReceivedMessageData{
+		ID:          id,
+		Title:       msg.Title,
+		Receiver:    msg.ToEmail,
+		Body:        msg.Body,
+		Sender:      msg.FromEmail,
+		Attachments: attachmentsList,
+		Replies:     replies,
+	}, Success: true}, http.StatusOK)
 }
