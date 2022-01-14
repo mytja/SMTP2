@@ -27,6 +27,7 @@ type HTTP interface {
 	GetSentMessageHandler(w http.ResponseWriter, r *http.Request)
 	GetInboxHandler(w http.ResponseWriter, r *http.Request)
 	GetSentInboxHandler(w http.ResponseWriter, r *http.Request)
+	GetDraftInboxHandler(w http.ResponseWriter, r *http.Request)
 	UpdateMessage(w http.ResponseWriter, r *http.Request)
 	DeleteMessage(w http.ResponseWriter, r *http.Request)
 	RetrieveMessageFromRemoteServer(w http.ResponseWriter, r *http.Request)

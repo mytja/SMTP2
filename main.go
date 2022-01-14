@@ -125,6 +125,7 @@ func main() {
 	r.HandleFunc("/smtp2/message/new", httphandler.NewMessageHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/inbox/inbox", httphandler.GetInboxHandler).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/message/inbox/sent", httphandler.GetSentInboxHandler).Methods(httphandlers.GET)
+	r.HandleFunc("/smtp2/message/inbox/draft", httphandler.GetDraftInboxHandler).Methods(httphandlers.GET)
 	r.HandleFunc("/smtp2/message/update", httphandler.UpdateMessage).Methods(httphandlers.PATCH)
 	r.HandleFunc("/smtp2/message/reply/{id}", httphandler.NewReplyHandler).Methods(httphandlers.POST)
 	r.HandleFunc("/smtp2/message/delete/{id}", httphandler.DeleteMessage).Methods(httphandlers.DELETE)

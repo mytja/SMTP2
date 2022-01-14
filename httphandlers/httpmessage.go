@@ -139,6 +139,45 @@ func (server *httpImpl) GetSentInboxHandler(w http.ResponseWriter, r *http.Reque
 	WriteJSON(w, m, http.StatusOK)
 }
 
+func (server *httpImpl) GetDraftInboxHandler(w http.ResponseWriter, r *http.Request) {
+	isAuth, username, err := server.security.CheckUser(r)
+	if err != nil || !isAuth {
+		WriteForbiddenJWT(w, err)
+		return
+	}
+	server.logger.Info(username)
+
+	inbox, err := server.db.GetAllSentMessages(username)
+	if err != nil {
+		server.logger.Info(err)
+		return
+	}
+	protocol := "http://"
+	if server.config.HTTPSEnabled {
+		protocol = "https://"
+	}
+	var m = InboxDataResponse{Data: make([]MessageData, 0)}
+	for i := 0; i < len(inbox); i++ {
+		msg := inbox[i]
+		basemsg, err := server.db.GetMessageFromReplyTo(msg.ID)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed to retrieve base message from database", Success: false, Error: err.Error()}, http.StatusInternalServerError)
+			return
+		}
+		if basemsg.IsDraft {
+			var m1 = MessageData{
+				ID:       msg.ID,
+				URI:      protocol + server.config.HostURL + "/smtp2/message/sent/get/" + fmt.Sprint(msg.ID),
+				Receiver: msg.ToEmail,
+				Sender:   msg.FromEmail,
+				Title:    msg.Title,
+			}
+			m.Data = append(m.Data, m1)
+		}
+	}
+	WriteJSON(w, m, http.StatusOK)
+}
+
 func (server *httpImpl) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("Title")
 	body := r.FormValue("Body")
