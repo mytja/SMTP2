@@ -162,7 +162,7 @@ func main() {
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
-		AllowedHeaders: []string{"X-Login-Token", "ReplyTo"},
+		AllowedHeaders: []string{"X-Login-Token", "ReplyTo", "UseMessage"},
 		AllowedMethods: []string{httphandlers.POST, httphandlers.GET, httphandlers.DELETE, httphandlers.PATCH, httphandlers.PUT},
 		Debug:          config.Debug,
 	})
