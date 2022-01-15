@@ -440,5 +440,6 @@ func (server *httpImpl) GetSentMessageData(w http.ResponseWriter, r *http.Reques
 		Sender:      msg.FromEmail,
 		Attachments: attachmentsList,
 		Replies:     replies,
+		IsDraft:     basemsg.IsDraft,
 	}, Success: true}, http.StatusOK)
 }

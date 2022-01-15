@@ -72,6 +72,7 @@ type ReceivedMessageData struct {
 	Attachments []Attachment  `json:"Attachments"`
 	Body        string        `json:"Body"`
 	Replies     []interface{} `json:"Replies"`
+	IsDraft     bool          `json:"IsDraft"`
 }
 
 type ReceivedMessageResponse struct {
