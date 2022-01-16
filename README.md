@@ -1,4 +1,6 @@
 # SMTP2
+![play_store_512](https://user-images.githubusercontent.com/52399966/149671395-c6a126a4-3c2b-48f3-9f00-64fef3214aad.png)
+
 A Go implementation for SMTP2 protocol
 
 # Received messages & sent messages
