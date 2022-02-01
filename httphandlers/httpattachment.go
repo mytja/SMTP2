@@ -65,7 +65,7 @@ func (server *httpImpl) UploadFile(w http.ResponseWriter, r *http.Request) {
 	lastattachmentid := server.db.GetLastAttachmentID()
 	fileext := helpers.GetFileExtension(handler.Filename)
 	filename := "attachments/" + id + "/" + fmt.Sprint(lastattachmentid) + fileext
-	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename, pass)
+	newattachment := sql.NewAttachment(lastattachmentid, idint, handler.Filename, filename, pass, false, "")
 
 	defer file.Close()
 
@@ -147,10 +147,12 @@ func (server *httpImpl) DeleteAttachment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = os.Remove(attachment.Filename)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Error while trying to remove file", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
+	if !attachment.IsForwarded {
+		err = os.Remove(attachment.Filename)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Error while trying to remove file", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = server.db.DeleteAttachment(midint, aidint)
@@ -191,7 +193,7 @@ func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sentmsg.FromEmail != from {
-		WriteJSON(w, Response{Data: "Forbidden", Success: false}, http.StatusForbidden)
+		WriteForbiddenJWT(w, errors.New("you haven't sent/received this message"))
 		return
 	}
 
@@ -201,48 +203,59 @@ func (server *httpImpl) GetAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Openfile, err := os.Open(attachment.Filename)
-	defer Openfile.Close()
-	if err != nil {
-		WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
-		return
-	}
+	var filebytes []byte
+	var ContentType string
+	var ContentLength string
 
-	//File is found, create and send the correct headers
+	if attachment.IsForwarded {
+		res, err := req.Get(attachment.URLToForward)
+		if err != nil {
+			return
+		}
+		if res.Response().StatusCode != http.StatusOK {
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read file from URL", Success: false}, http.StatusInternalServerError)
+			return
+		}
+		filebytes = res.Bytes()
+		ContentType = res.Response().Header.Get("Content-Type")
+		ContentLength = res.Response().Header.Get("Content-Length")
 
-	//Get the Content-Type of the file
-	//Create a buffer to store the header of the file in
-	FileHeader := make([]byte, 512)
-	//Copy the headers into the FileHeader buffer
-	_, err = Openfile.Read(FileHeader)
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read file", Success: false}, http.StatusInternalServerError)
-		return
-	}
-	//Get content type of file
-	FileContentType := http.DetectContentType(FileHeader)
+		//Send the headers
+		headers := w.Header()
+		headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
+		headers.Set("Content-Type", ContentType)
+		headers.Set("Content-Length", ContentLength)
 
-	//Get the file size
-	FileStat, _ := Openfile.Stat()                     //Get info from file
-	FileSize := strconv.FormatInt(FileStat.Size(), 10) //Get file size as a string
+		_, err = w.Write(filebytes)
+		if err != nil {
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to write to writer", Success: false}, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		Openfile, err := os.Open(attachment.Filename)
+		defer Openfile.Close()
+		if err != nil {
+			WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
+			return
+		}
+		FileLength := make([]byte, 512)
+		_, err = Openfile.Read(FileLength)
+		ContentType = http.DetectContentType(filebytes)
+		FileStat, _ := Openfile.Stat()
+		ContentLength = strconv.FormatInt(FileStat.Size(), 10)
 
-	//Send the headers
-	headers := w.Header()
-	headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
-	headers.Set("Content-Type", FileContentType)
-	headers.Set("Content-Length", FileSize)
+		Openfile.Seek(0, 0)
 
-	//Send the file
-	//We read 512 bytes from the file already, so we reset the offset back to 0
-	_, err = Openfile.Seek(0, 0)
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	_, err = io.Copy(w, Openfile)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
+		headers := w.Header()
+		headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
+		headers.Set("Content-Type", ContentType)
+		headers.Set("Content-Length", ContentLength)
+
+		_, err = io.Copy(w, Openfile)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -273,50 +286,75 @@ func (server *httpImpl) RetrieveAttachment(w http.ResponseWriter, r *http.Reques
 		WriteJSON(w, Response{Data: "Attachment password isn't matching to one saved in database", Success: false}, http.StatusForbidden)
 		return
 	}
+	if attachment.IsForwarded {
+		res, err := req.Get(attachment.URLToForward)
+		if err != nil {
+			return
+		}
+		if res.Response().StatusCode != http.StatusOK {
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to read file from URL", Success: false}, http.StatusInternalServerError)
+			return
+		}
+		filebytes := res.Bytes()
+		ContentType := res.Response().Header.Get("Content-Type")
+		ContentLength := res.Response().Header.Get("Content-Length")
 
-	Openfile, err := os.Open(attachment.Filename)
-	defer Openfile.Close()
-	if err != nil {
-		WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
-		return
-	}
+		//Send the headers
+		headers := w.Header()
+		headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
+		headers.Set("Content-Type", ContentType)
+		headers.Set("Content-Length", ContentLength)
 
-	//File is found, create and send the correct headers
+		_, err = w.Write(filebytes)
+		if err != nil {
+			WriteJSON(w, Response{Error: err.Error(), Data: "Failed to write to writer", Success: false}, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		Openfile, err := os.Open(attachment.Filename)
+		defer Openfile.Close()
+		if err != nil {
+			WriteJSON(w, Response{Data: "File not found.", Error: err.Error(), Success: false}, http.StatusNotFound)
+			return
+		}
 
-	//Get the Content-Type of the file
-	//Create a buffer to store the header of the file in
-	FileHeader := make([]byte, 512)
-	//Copy the headers into the FileHeader buffer
-	_, err = Openfile.Read(FileHeader)
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	//Get content type of file
-	FileContentType := http.DetectContentType(FileHeader)
+		//File is found, create and send the correct headers
 
-	//Get the file size
-	FileStat, _ := Openfile.Stat()                     //Get info from file
-	FileSize := strconv.FormatInt(FileStat.Size(), 10) //Get file size as a string
+		//Get the Content-Type of the file
+		//Create a buffer to store the header of the file in
+		FileHeader := make([]byte, 512)
+		//Copy the headers into the FileHeader buffer
+		_, err = Openfile.Read(FileHeader)
+		if err != nil {
+			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
+			return
+		}
+		//Get content type of file
+		FileContentType := http.DetectContentType(FileHeader)
 
-	//Send the headers
-	headers := w.Header()
-	headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
-	headers.Set("Content-Type", FileContentType)
-	headers.Set("Content-Length", FileSize)
-	headers.Set("X-Filename", attachment.OriginalName)
+		//Get the file size
+		FileStat, _ := Openfile.Stat()                     //Get info from file
+		FileSize := strconv.FormatInt(FileStat.Size(), 10) //Get file size as a string
 
-	//Send the file
-	//We read 512 bytes from the file already, so we reset the offset back to 0
-	_, err = Openfile.Seek(0, 0)
-	if err != nil {
-		WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
-	}
-	_, err = io.Copy(w, Openfile)
-	if err != nil {
-		WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
-		return
+		//Send the headers
+		headers := w.Header()
+		headers.Set("Content-Disposition", "attachment; filename="+attachment.OriginalName)
+		headers.Set("Content-Type", FileContentType)
+		headers.Set("Content-Length", FileSize)
+		headers.Set("X-Filename", attachment.OriginalName)
+
+		//Send the file
+		//We read 512 bytes from the file already, so we reset the offset back to 0
+		_, err = Openfile.Seek(0, 0)
+		if err != nil {
+			WriteJSON(w, Response{Error: err.Error(), Success: false}, http.StatusInternalServerError)
+			return
+		}
+		_, err = io.Copy(w, Openfile)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Failed writing file to writer.", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -344,7 +382,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 
 	message, err := server.db.GetReceivedMessage(midint)
 	if err != nil {
-		WriteJSON(w, Response{Data: "Failed to retrieve SentMessage from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
+		WriteJSON(w, Response{Data: "Failed to retrieve ReceivedMessage from database", Error: err.Error(), Success: false}, http.StatusInternalServerError)
 		return
 	}
 
@@ -379,6 +417,7 @@ func (server *httpImpl) RetrieveAttachmentFromRemoteServer(w http.ResponseWriter
 			url = attachment.URL
 		}
 	}
+	server.logger.Debug(url)
 	if url == "" {
 		WriteJSON(w, Response{Data: "Could not find attachment with following ID", Success: false}, http.StatusNotFound)
 		return

@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS attachments (
 	original_name     VARCHAR(100)  NOT NULL,
 	filename          VARCHAR(100)  NOT NULL,
 	message_id        INTEGER       NOT NULL,
-	attachment_pass   VARCHAR(100)  NOT NULL
+	attachment_pass   VARCHAR(100)  NOT NULL,
+	is_forwarded      BOOLEAN       NOT NULL,
+	url_to_forward    VARCHAR(300)
 );
 CREATE TABLE IF NOT EXISTS sentmsgs (
 	id           INTEGER       PRIMARY KEY,

@@ -6,21 +6,25 @@ type Attachment struct {
 	OriginalName   string `db:"original_name"`
 	Filename       string
 	AttachmentPass string `db:"attachment_pass"`
+	IsForwarded    bool   `db:"is_forwarded"`
+	URLToForward   string `db:"url_to_forward"`
 }
 
-func NewAttachment(ID int, MessageID int, OriginalName string, Filename string, Pass string) Attachment {
+func NewAttachment(ID int, MessageID int, OriginalName string, Filename string, Pass string, IsForwarded bool, URLToForward string) Attachment {
 	return Attachment{
 		ID:             ID,
 		MessageID:      MessageID,
 		OriginalName:   OriginalName,
 		Filename:       Filename,
 		AttachmentPass: Pass,
+		IsForwarded:    IsForwarded,
+		URLToForward:   URLToForward,
 	}
 }
 
 func (db *sqlImpl) CommitAttachment(attachment Attachment) error {
 	_, err := db.tx.NamedExec(
-		"INSERT INTO attachments (id, message_id, original_name, filename, attachment_pass) VALUES (:id, :message_id, :original_name, :filename, :attachment_pass)",
+		"INSERT INTO attachments (id, message_id, original_name, filename, attachment_pass, is_forwarded, url_to_forward) VALUES (:id, :message_id, :original_name, :filename, :attachment_pass, :is_forwarded, :url_to_forward)",
 		attachment)
 	if err != nil {
 		return err

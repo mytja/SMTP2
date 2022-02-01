@@ -3,6 +3,7 @@ package httphandlers
 import (
 	"fmt"
 	"github.com/imroc/req"
+	"github.com/mytja/SMTP2/security"
 	"github.com/mytja/SMTP2/sql"
 	"net/http"
 	"strconv"
@@ -10,11 +11,12 @@ import (
 )
 
 type DraftResponse struct {
-	ID    int    `json:"ID"`
-	To    string `json:"To"`
-	Title string `json:"Title"`
-	Body  string `json:"Body"`
-	From  string `json:"From"`
+	ID          int          `json:"ID"`
+	To          string       `json:"To"`
+	Title       string       `json:"Title"`
+	Body        string       `json:"Body"`
+	From        string       `json:"From"`
+	Attachments []Attachment `json:"Attachments"`
 }
 
 func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +39,10 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve User from database", Success: false}, http.StatusNotFound)
 		return
 	}
+
+	id := server.db.GetLastMessageID()
+
+	var atts = make([]Attachment, 0)
 
 	replyto := r.Header.Get("ReplyTo")
 	usemessage := r.Header.Get("UseMessage")
@@ -114,6 +120,43 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 				editedmsgbody = append(editedmsgbody, fmt.Sprint("> ", line))
 			}
 
+			attachments, err := server.db.GetAllAttachments(msg.ID)
+			if err != nil {
+				WriteJSON(w, Response{Error: err.Error(), Data: "Failed to retrieve attachments from database", Success: false}, http.StatusInternalServerError)
+				return
+			}
+
+			for i := 0; i < len(attachments); i++ {
+				att := attachments[i]
+				pass, err := security.GenerateRandomString(80)
+				if err != nil {
+					WriteJSON(
+						w,
+						Response{
+							Data:    "Failed to generate random password. This is completely server's fault",
+							Error:   err.Error(),
+							Success: false,
+						},
+						http.StatusInternalServerError,
+					)
+					return
+				}
+				newattachment := sql.NewAttachment(server.db.GetLastAttachmentID(), id, att.OriginalName, att.Filename, pass, false, "")
+				err = server.db.CommitAttachment(newattachment)
+				if err != nil {
+					WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit attachment", Success: false}, http.StatusInternalServerError)
+					return
+				}
+
+				protocol := "http://"
+				if server.config.HTTPSEnabled {
+					protocol = "https://"
+				}
+
+				attachmentJson := Attachment{ID: id, URL: fmt.Sprintf("%s%s/smtp2/attachment/get/%s/%s", protocol, server.config.HostURL, fmt.Sprint(id), fmt.Sprint(newattachment.ID))}
+				atts = append(atts, attachmentJson)
+			}
+
 			// This formatting is disgusting, but it's currently best possible
 
 			forwardmessage = fmt.Sprintf(`
@@ -155,6 +198,37 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			server.logger.Debug(j)
 
+			for i := 0; i < len(j.Data.Attachments); i++ {
+				att := j.Data.Attachments[i]
+				pass, err := security.GenerateRandomString(80)
+				if err != nil {
+					WriteJSON(
+						w,
+						Response{
+							Data:    "Failed to generate random password. This is completely server's fault",
+							Error:   err.Error(),
+							Success: false,
+						},
+						http.StatusInternalServerError,
+					)
+					return
+				}
+				newattachment := sql.NewAttachment(server.db.GetLastAttachmentID(), id, att.Filename, "", pass, true, att.URL)
+				err = server.db.CommitAttachment(newattachment)
+				if err != nil {
+					WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit attachment", Success: false}, http.StatusInternalServerError)
+					return
+				}
+
+				protocol := "http://"
+				if server.config.HTTPSEnabled {
+					protocol = "https://"
+				}
+
+				attachmentJson := Attachment{ID: id, URL: fmt.Sprintf("%s%s/smtp2/attachment/get/%s/%s", protocol, server.config.HostURL, fmt.Sprint(id), fmt.Sprint(newattachment.ID)), Filename: att.Filename}
+				atts = append(atts, attachmentJson)
+			}
+
 			msgbody := strings.Split(j.Data.Body, "\n")
 			editedmsgbody := make([]string, 0)
 			for i := 0; i < len(msgbody); i++ {
@@ -175,7 +249,6 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	id := server.db.GetLastMessageID()
 	msg := sql.NewDraftMessage(id, originalid, replypass, replyid)
 	sentmsg := sql.NewDraftSentMessage(id, title, to, from, fmt.Sprint("", "\n", user.Signature, "\n", forwardmessage))
 	err = server.db.CommitMessage(msg)
@@ -188,5 +261,5 @@ func (server *httpImpl) NewDraft(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, Response{Error: err.Error(), Data: "Failed to commit SentMessage to database", Success: false}, http.StatusInternalServerError)
 		return
 	}
-	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: title, To: to, Body: sentmsg.Body}, Success: true}, http.StatusCreated)
+	WriteJSON(w, Response{Data: DraftResponse{ID: id, Title: title, To: to, Body: sentmsg.Body, Attachments: atts}, Success: true}, http.StatusCreated)
 }
