@@ -19,10 +19,10 @@ Server 2: `go run . --host 127.0.0.1 --port 8081 --dbconfig smtp2-1.db --debug`
 
 # Special thanks
 Thanks to following people for direct contribution:
-- [mytja](https://github.com/mytja)
+- [Mitja](https://github.com/mytja)
 
 Thanks to following people for direct support (contributing to issues and resolving many problems I encountered during this protocol journey):
-- [Currently None]
+- [Blaž Abram](https://github.com/BlazAbram)
 
 Thanks to following people/organizations for indirect contribution (libraries):
 - [Gorilla Web Toolkit](https://github.com/gorilla) for [mux](https://github.com/gorilla/mux)
