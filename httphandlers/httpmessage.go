@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/imroc/req"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -251,6 +252,18 @@ func (server *httpImpl) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		if message.FromEmail != from {
 			WriteJSON(w, Response{Data: "You don't have permission to delete this message", Success: false}, http.StatusForbidden)
 			return
+		}
+
+		attachments, err := server.db.GetAllAttachments(id)
+		if err != nil {
+			WriteJSON(w, Response{Data: "Could not retrieve all attachments", Success: false, Error: err.Error()}, http.StatusInternalServerError)
+			return
+		}
+
+		for i := 0; i < len(attachments); i++ {
+			attachment := attachments[i]
+			os.Remove(attachment.Filename)
+			server.db.DeleteAttachment(id, attachment.ID)
 		}
 
 		server.db.DeleteSentMessage(id)
